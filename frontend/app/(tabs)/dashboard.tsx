@@ -545,33 +545,6 @@ const styles = StyleSheet.create({
     color: colors.neutral[50],
     fontWeight: '600',
   },
-  actionCard: {
-    margin: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  actionCardContent: {
-    alignItems: 'center',
-  },
-  actionCardIcon: {
-    fontSize: 64,
-    marginBottom: spacing.md,
-  },
-  actionCardTitle: {
-    ...typography.h2,
-    color: colors.neutral[900],
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  actionCardDescription: {
-    ...typography.body,
-    color: colors.neutral[600],
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-    lineHeight: typography.body.lineHeight,
-  },
-  actionButton: {
-    marginTop: spacing.sm,
-  },
   quickActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
