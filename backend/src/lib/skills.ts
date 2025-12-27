@@ -139,12 +139,13 @@ export async function checkAndUnlockSkills(userId: string): Promise<string[]> {
     },
   });
 
-  if (!user?.trainingPlan) {
+  const activePlan = user?.trainingPlans?.[0];
+  if (!activePlan) {
     return [];
   }
 
-  const completedLessons = user.trainingPlan.lessons;
-  const unlockedSkillIds = new Set(user.userSkills.map(us => us.skillId));
+  const completedLessons = activePlan.lessons;
+  const unlockedSkillIds = new Set(user.userSkills.map((us: any) => us.skillId));
   const newlyUnlocked: string[] = [];
 
   // Process each skill definition
@@ -247,13 +248,14 @@ export async function getMilestones(userId: string) {
     },
   });
 
-  if (!user?.trainingPlan) {
+  const activePlan = user?.trainingPlans?.[0];
+  if (!activePlan) {
     return [];
   }
 
   const milestones = [];
-  const totalLessons = user.trainingPlan.lessons.length;
-  const completedLessons = user.trainingPlan.lessons.filter(l => l.isCompleted).length;
+  const totalLessons = activePlan.lessons.length;
+  const completedLessons = activePlan.lessons.filter((l: any) => l.isCompleted).length;
   const totalSkills = user.userSkills.length;
   const completionPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
@@ -264,7 +266,7 @@ export async function getMilestones(userId: string) {
       title: 'First Steps',
       description: 'Completed your first lesson!',
       achieved: true,
-      achievedAt: user.trainingPlan.lessons.find(l => l.isCompleted)?.completedAt,
+      achievedAt: activePlan.lessons.find((l: any) => l.isCompleted)?.completedAt,
     });
   }
 
