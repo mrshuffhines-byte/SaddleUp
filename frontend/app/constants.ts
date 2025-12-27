@@ -1,4 +1,10 @@
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+// API URL - uses localhost in development, production URL in production
+// To override, set EXPO_PUBLIC_API_URL environment variable
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || (
+  typeof __DEV__ !== 'undefined' && __DEV__ 
+    ? 'http://localhost:3001'
+    : 'https://saddleup-backend-production.up.railway.app'
+);
 
 export const COLORS = {
   primary: '#8B7355',
