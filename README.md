@@ -8,7 +8,7 @@ An AI-powered horse training app for beginner horse owners.
 - **Backend**: Express.js with TypeScript
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: Email-based auth
-- **AI**: Anthropic Claude API for generating training plans
+- **AI**: Perplexity API for generating training plans and chat responses
 - **Storage**: Cloudinary for media uploads
 
 ## Project Structure
@@ -89,7 +89,7 @@ SaddleUp/
 
 - `DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: Secret key for JWT tokens
-- `ANTHROPIC_API_KEY`: Anthropic Claude API key
+- `PERPLEXITY_API_KEY`: Perplexity API key for AI features
 - `CLOUDINARY_CLOUD_NAME`: Cloudinary cloud name
 - `CLOUDINARY_API_KEY`: Cloudinary API key
 - `CLOUDINARY_API_SECRET`: Cloudinary API secret

@@ -8,7 +8,7 @@ const router = express.Router();
 // Get all methods
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const category = req.query?.category;
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
 
     const methods = await prisma.horsemanshipMethod.findMany({
       where: category ? { category } : undefined,

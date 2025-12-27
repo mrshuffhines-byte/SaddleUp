@@ -7,7 +7,7 @@ This guide will help you set up and run the SaddleUp application locally.
 - Node.js (v18 or higher)
 - PostgreSQL database
 - npm or yarn package manager
-- Anthropic Claude API key
+- Perplexity API key
 
 ## Backend Setup
 
@@ -30,7 +30,7 @@ This guide will help you set up and run the SaddleUp application locally.
    ```env
    DATABASE_URL="postgresql://user:password@localhost:5432/saddleup?schema=public"
    JWT_SECRET="your-secret-key-change-in-production"
-   ANTHROPIC_API_KEY="your-anthropic-api-key"
+   PERPLEXITY_API_KEY="your-perplexity-api-key"
    PORT=3001
    NODE_ENV=development
    ```
@@ -165,7 +165,7 @@ SaddleUp/
 - The frontend uses Expo Router for file-based routing
 - All API calls require authentication via Bearer token (JWT)
 - The app uses AsyncStorage for local token storage
-- Training plans are generated using Anthropic's Claude API
+- Training plans are generated using Perplexity API
 
 ## Next Steps
 

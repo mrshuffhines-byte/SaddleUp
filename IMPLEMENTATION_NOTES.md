@@ -30,7 +30,7 @@
    - `/api/sessions/:id` - Get session by ID
 
 4. **AI Integration**
-   - Claude API integration for generating personalized training plans
+   - Perplexity API integration for generating personalized training plans
    - Structured prompt that creates phases > modules > lessons hierarchy
    - Safety-conscious plan generation with professional instruction flags
 
@@ -72,7 +72,8 @@ SaddleUp/
 │   │   ├── lib/
 │   │   │   ├── prisma.ts        # Prisma client
 │   │   │   ├── auth.ts          # Password hashing, JWT
-│   │   │   └── claude.ts        # Claude API integration
+│   │   │   └── claude.ts        # Perplexity API integration (training plans)
+│   │   │   └── perplexity.ts    # Perplexity API helper functions
 │   │   ├── middleware/
 │   │   │   └── auth.ts          # Authentication middleware
 │   │   ├── routes/
@@ -141,7 +142,7 @@ SaddleUp/
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/saddleup?schema=public"
 JWT_SECRET="your-secret-key-change-in-production"
-ANTHROPIC_API_KEY="your-anthropic-api-key"
+PERPLEXITY_API_KEY="your-perplexity-api-key"
 PORT=3001
 NODE_ENV=development
 ```

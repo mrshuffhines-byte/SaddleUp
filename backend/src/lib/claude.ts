@@ -1,8 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-});
+import { callPerplexityWithPrompt } from './perplexity';
 
 export interface OnboardingData {
   experienceLevel: string;
@@ -115,39 +111,30 @@ Return your response as a JSON object with this exact structure:
 Make sure the JSON is valid and parseable.`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 8192,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    });
+    // Use a prompt that instructs Perplexity to return JSON
+    const jsonPrompt = `${prompt}\n\nPlease respond with ONLY valid JSON, no additional text or markdown formatting.`;
+      
+    const responseText = await callPerplexityWithPrompt(
+      'You are an expert horse training plan generator. Always respond with valid JSON only.',
+      jsonPrompt,
+      'llama-3.1-sonar-large-128k-online'
+    );
 
-    const content = message.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
+    // Clean up response (remove markdown code blocks if present)
+    let cleanedResponse = responseText.trim();
+    if (cleanedResponse.startsWith('```json')) {
+      cleanedResponse = cleanedResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    } else if (cleanedResponse.startsWith('```')) {
+      cleanedResponse = cleanedResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
 
-    // Extract JSON from the response (might have markdown code blocks)
-    let jsonText = content.text.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.substring(7);
-    }
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.substring(3);
-    }
-    if (jsonText.endsWith('```')) {
-      jsonText = jsonText.substring(0, jsonText.length - 3);
-    }
-    jsonText = jsonText.trim();
-
-    const plan = JSON.parse(jsonText) as TrainingPlanStructure;
+    const plan = JSON.parse(cleanedResponse) as TrainingPlanStructure;
     return plan;
   } catch (error) {
     console.error('Error generating training plan:', error);
+    if (error instanceof SyntaxError) {
+      throw new Error('Failed to parse training plan JSON');
+    }
     throw new Error('Failed to generate training plan');
   }
 }

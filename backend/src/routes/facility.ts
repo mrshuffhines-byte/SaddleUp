@@ -86,7 +86,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         roundPen: data.roundPen || false,
         roundPenSize: data.roundPenSize,
         trailAccess: data.trailAccess,
-        obstacles: data.obstacles || null,
+        obstacles: data.obstacles || undefined,
         tieSafe: data.tieSafe,
         washRack: data.washRack || false,
         pasture: data.pasture || false,
@@ -128,7 +128,7 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       data: {
         ...data,
-        obstacles: data.obstacles !== undefined ? data.obstacles : undefined,
+        obstacles: data.obstacles !== undefined ? (data.obstacles || undefined) : undefined,
       },
     });
 

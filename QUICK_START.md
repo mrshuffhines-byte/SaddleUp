@@ -19,7 +19,7 @@ cp env.example .env
 Edit `.env` with your configuration:
 - `DATABASE_URL` - Your PostgreSQL connection string
 - `JWT_SECRET` - A random secret key for authentication
-- `ANTHROPIC_API_KEY` - Your Claude API key (optional for basic functionality)
+- `PERPLEXITY_API_KEY` - Your Perplexity API key (optional for basic functionality)
 
 Then set up the database:
 ```bash

@@ -51,7 +51,7 @@ Before starting, make sure you have:
 2. **Environment Variables** (backend/.env):
    - `DATABASE_URL` - PostgreSQL connection string
    - `JWT_SECRET` - Secret key for authentication
-   - `ANTHROPIC_API_KEY` - Claude API key (for AI features)
+   - `PERPLEXITY_API_KEY` - Perplexity API key (for AI features)
    - `CLOUDINARY_*` - Cloudinary credentials (for media uploads)
 
 3. **Dependencies Installed**:

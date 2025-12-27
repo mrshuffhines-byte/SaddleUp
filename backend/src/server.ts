@@ -19,8 +19,16 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+const allowedOrigins: string[] = [
+  'http://localhost:3000',
+  'http://localhost:8081',
+  'http://localhost:19006',
+  'https://the-rein-training-app.expo.app',
+  process.env.FRONTEND_URL,
+].filter((origin): origin is string => typeof origin === 'string');
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
   credentials: true
 }));
 app.use(express.json());
@@ -39,8 +47,12 @@ app.use('/api/horses', horseRoutes);
 app.use('/api/facilities', facilityRoutes);
 
 // Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), message: 'SaddleUp API is running' });
+});
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SaddleUp API is running' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), message: 'SaddleUp API is running' });
 });
 
 app.listen(PORT, () => {

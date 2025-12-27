@@ -1,9 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from './prisma';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-});
+import { callPerplexityAPI } from './perplexity';
 
 interface TimestampReference {
   timestamp: string; // e.g., "0:15", "0:20-0:25"
@@ -239,23 +235,22 @@ export async function generateChatResponse(params: {
   });
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4096,
-      system: contextPrompt,
-      messages: messages as any,
-    });
+    // Build messages array for Perplexity (includes system as first message)
+    const perplexityMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      { role: 'system', content: contextPrompt },
+      ...messages.map(msg => ({
+        role: msg.role as 'system' | 'user' | 'assistant',
+        content: msg.content,
+      })),
+    ];
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
+    const responseText = await callPerplexityAPI(perplexityMessages);
 
     // Extract timestamp references from video analysis
-    const mediaAnalysis = mediaUrls.length > 0 ? extractTimestampAnalysis(content.text, mediaUrls) : undefined;
+    const mediaAnalysis = mediaUrls.length > 0 ? extractTimestampAnalysis(responseText, mediaUrls) : undefined;
 
     return {
-      content: content.text,
+      content: responseText,
       mediaAnalysis,
     };
   } catch (error) {

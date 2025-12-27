@@ -96,7 +96,15 @@ export async function buildComprehensiveContext(params: {
 
   // Build method experience from both profile and preferences
   const methodRatings = user?.methodPreference?.methodRatings as any[] || [];
-  const experiencedMethods = user?.profile?.experiencedMethods as any[] || [];
+  
+  // Use type assertion and optional chaining for fields not yet in schema
+  const profile = user?.profile as any;
+  const experiencedMethods = profile?.experiencedMethods || [];
+  const physicalLimitations = profile?.physicalLimitations || [];
+  const confidenceAreas = profile?.confidenceAreas || [];
+  const struggleAreas = profile?.struggleAreas || [];
+  const learningStyle = profile?.learningStyle;
+  const riskTolerance = profile?.riskTolerance;
   
   // Combine and enrich with method details
   const methodExperience: any[] = [];
@@ -162,11 +170,11 @@ export async function buildComprehensiveContext(params: {
       profile: user?.profile || undefined,
       methodExperience: methodExperience.length > 0 ? methodExperience : undefined,
       methodRatings: methodRatings.length > 0 ? methodRatings : undefined,
-      physicalLimitations: user?.profile?.physicalLimitations as any[] || undefined,
-      confidenceAreas: user?.profile?.confidenceAreas as any[] || undefined,
-      struggleAreas: user?.profile?.struggleAreas as any[] || undefined,
-      learningStyle: user?.profile?.learningStyle || undefined,
-      riskTolerance: user?.profile?.riskTolerance || undefined,
+      physicalLimitations: (user?.profile as any)?.physicalLimitations as any[] || undefined,
+      confidenceAreas: (user?.profile as any)?.confidenceAreas as any[] || undefined,
+      struggleAreas: (user?.profile as any)?.struggleAreas as any[] || undefined,
+      learningStyle: (user?.profile as any)?.learningStyle || undefined,
+      riskTolerance: (user?.profile as any)?.riskTolerance || undefined,
     },
     facility: facility || undefined,
     weatherContext: weatherContext || undefined,
