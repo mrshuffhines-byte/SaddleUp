@@ -7,6 +7,7 @@ interface InputProps extends TextInputProps {
   error?: string;
   icon?: string;
   containerStyle?: any;
+  rightIcon?: React.ReactNode;
 }
 
 export default function Input({
@@ -15,6 +16,7 @@ export default function Input({
   icon,
   containerStyle,
   style,
+  rightIcon,
   ...props
 }: InputProps) {
   return (
@@ -23,10 +25,15 @@ export default function Input({
       <View style={[styles.inputContainer, error && styles.inputError]}>
         {icon && <Text style={styles.icon}>{icon}</Text>}
         <TextInput
-          style={[styles.input, icon && styles.inputWithIcon, style]}
+          style={[styles.input, icon && styles.inputWithIcon, rightIcon && styles.inputWithRightIcon, style]}
           placeholderTextColor={colors.neutral[400]}
           {...props}
         />
+        {rightIcon && (
+          <View style={styles.rightIconContainer}>
+            {rightIcon}
+          </View>
+        )}
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -67,6 +74,15 @@ const styles = StyleSheet.create({
   },
   inputWithIcon: {
     paddingLeft: 0,
+  },
+  inputWithRightIcon: {
+    paddingRight: spacing.md + 24,
+  },
+  rightIconContainer: {
+    position: 'absolute',
+    right: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorText: {
     ...typography.caption,

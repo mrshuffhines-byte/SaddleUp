@@ -1,28 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
-  Alert,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  Alert,
+  ActivityIndicator,
+  Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { Input, Button } from '../../components/ui';
+import Card from '../../components/ui/Card';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'email' | 'code'>('email');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; code?: string }>({});
   const router = useRouter();
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleRequestCode = async () => {
+    setErrors({});
+    
+    if (!email) {
+      setErrors({ email: 'Email is required' });
+      return;
+    }
+    
+    if (!validateEmail(email)) {
+      setErrors({ email: 'Please enter a valid email address' });
       return;
     }
 
@@ -30,37 +58,56 @@ export default function LoginScreen() {
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
-
-      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send login code');
       }
 
-      await AsyncStorage.setItem('authToken', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      setStep('code');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send login code');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Check if user has completed onboarding
-      const userResponse = await fetch(`${API_URL}/api/user/me`, {
-        headers: {
-          Authorization: `Bearer ${data.token}`,
-        },
+  const handleVerifyCode = async () => {
+    setErrors({});
+    
+    if (!code || code.length !== 6) {
+      setErrors({ code: 'Please enter the 6-digit code' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
       });
 
-      const userData = await userResponse.json();
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Invalid code');
+      }
 
-      if (userData.profile) {
-        router.replace('/(tabs)/dashboard');
-      } else {
+      const { token, user } = await response.json();
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+
+      if (!user.profile) {
         router.replace('/onboarding');
+      } else {
+        router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to login');
+      Alert.alert('Error', error.message || 'Invalid code. Please try again.');
+      setErrors({ code: error.message || 'Invalid code' });
     } finally {
       setLoading(false);
     }
@@ -71,53 +118,112 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          <Text style={styles.title}>SaddleUp</Text>
-          <Text style={styles.subtitle}>AI-Powered Horse Training</Text>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          {/* Logo/Icon */}
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoIcon}>🐴</Text>
+          </View>
 
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-            />
+          {/* Title and Tagline */}
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.tagline}>
+            Your Journey to Confident Horsemanship Starts Here
+          </Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
+          <Card style={styles.formCard}>
+            {step === 'email' ? (
+              <>
+                <Input
+                  label="Email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (errors.email) setErrors({ ...errors, email: undefined });
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  icon="📧"
+                  error={errors.email}
+                  containerStyle={styles.inputContainer}
+                />
 
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? 'Logging in...' : 'Login'}
-              </Text>
-            </TouchableOpacity>
+                <Button
+                  title="Send Login Code"
+                  onPress={handleRequestCode}
+                  loading={loading}
+                  style={styles.button}
+                  fullWidth
+                />
 
-            <TouchableOpacity
-              style={styles.linkButton}
-              onPress={() => router.push('/(auth)/signup')}
-            >
-              <Text style={styles.linkText}>
-                Don't have an account? Sign up
-              </Text>
+                <TouchableOpacity 
+                  style={styles.forgotPasswordLink}
+                  onPress={() => {
+                    // TODO: Implement forgot password flow
+                    Alert.alert('Forgot Password', 'Please contact support or try logging in again.');
+                  }}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot your email?</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.codeInstructions}>
+                  We sent a 6-digit code to{'\n'}
+                  <Text style={styles.emailText}>{email}</Text>
+                </Text>
+
+                <Input
+                  label="Verification Code"
+                  placeholder="Enter 6-digit code"
+                  value={code}
+                  onChangeText={(text) => {
+                    const numericCode = text.replace(/[^0-9]/g, '').slice(0, 6);
+                    setCode(numericCode);
+                    if (errors.code) setErrors({ ...errors, code: undefined });
+                  }}
+                  keyboardType="number-pad"
+                  icon="🔒"
+                  error={errors.code}
+                  containerStyle={styles.inputContainer}
+                  maxLength={6}
+                />
+
+                <Button
+                  title="Sign In"
+                  onPress={handleVerifyCode}
+                  loading={loading}
+                  style={styles.button}
+                  fullWidth
+                />
+
+                <TouchableOpacity 
+                  style={styles.backLink}
+                  onPress={() => {
+                    setStep('email');
+                    setCode('');
+                    setErrors({});
+                  }}
+                >
+                  <Text style={styles.backLinkText}>← Change email</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Card>
+
+          {/* Signup Link */}
+          <View style={styles.signupContainer}>
+            <Text style={styles.signupText}>New to horse training? </Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+              <Text style={styles.signupLink}>Create an account →</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -126,65 +232,89 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F1EA',
+    backgroundColor: colors.primary[50],
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.lg,
   },
   content: {
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
   },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  logoIcon: {
+    fontSize: 64,
+  },
   title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#8B7355',
+    ...typography.h1,
+    color: colors.neutral[900],
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
-  subtitle: {
-    fontSize: 18,
-    color: '#5A4A3A',
+  tagline: {
+    ...typography.body,
+    color: colors.neutral[600],
     textAlign: 'center',
-    marginBottom: 48,
+    marginBottom: spacing.xl,
+    lineHeight: typography.body.lineHeight,
   },
-  form: {
-    width: '100%',
+  formCard: {
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
-    color: '#333',
+  inputContainer: {
+    marginBottom: spacing.md,
   },
   button: {
-    backgroundColor: '#8B7355',
-    borderRadius: 12,
-    padding: 16,
+    marginTop: spacing.md,
+  },
+  forgotPasswordLink: {
+    marginTop: spacing.md,
     alignItems: 'center',
-    marginTop: 8,
   },
-  buttonDisabled: {
-    opacity: 0.6,
+  forgotPasswordText: {
+    ...typography.bodySmall,
+    color: colors.primary[600],
+    textDecorationLine: 'underline',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
+  codeInstructions: {
+    ...typography.body,
+    color: colors.neutral[700],
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: typography.body.lineHeight,
+  },
+  emailText: {
     fontWeight: '600',
+    color: colors.neutral[900],
   },
-  linkButton: {
-    marginTop: 24,
+  backLink: {
+    marginTop: spacing.md,
     alignItems: 'center',
   },
-  linkText: {
-    color: '#8B7355',
-    fontSize: 16,
+  backLinkText: {
+    ...typography.bodySmall,
+    color: colors.primary[600],
+  },
+  signupContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  signupText: {
+    ...typography.body,
+    color: colors.neutral[600],
+  },
+  signupLink: {
+    ...typography.body,
+    color: colors.primary[600],
+    fontWeight: '600',
   },
 });
