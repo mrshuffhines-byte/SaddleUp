@@ -236,11 +236,13 @@ export async function getMilestones(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      trainingPlan: {
-        include: {
-          lessons: true,
-        },
+    trainingPlans: {
+      where: { isActive: true },
+      include: {
+        lessons: true,
       },
+      take: 1, // Get most recent active plan
+    },
       userSkills: true,
     },
   });
