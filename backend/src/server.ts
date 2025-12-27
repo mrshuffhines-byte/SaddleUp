@@ -24,12 +24,41 @@ const allowedOrigins: string[] = [
   'http://localhost:8081',
   'http://localhost:19006',
   'https://the-rein-training-app.expo.app',
+  'https://api.thereinapp.com', // Allow API origin for subdomain requests
   process.env.FRONTEND_URL,
 ].filter((origin): origin is string => typeof origin === 'string');
 
 app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Always allow the Expo app origin
+    if (origin === 'https://the-rein-training-app.expo.app') {
+      return callback(null, true);
+    }
+    
+    // In development, allow localhost
+    if (origin.startsWith('http://localhost')) {
+      return callback(null, true);
+    }
+    
+    // Allow if FRONTEND_URL env var matches
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+    
+    console.warn('CORS blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 
