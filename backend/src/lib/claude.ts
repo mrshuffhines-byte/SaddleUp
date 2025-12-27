@@ -114,10 +114,10 @@ Make sure the JSON is valid and parseable.`;
     // Use a prompt that instructs Perplexity to return JSON
     const jsonPrompt = `${prompt}\n\nPlease respond with ONLY valid JSON, no additional text or markdown formatting.`;
       
-    const responseText = await callPerplexityWithPrompt(
+      const responseText = await callPerplexityWithPrompt(
       'You are an expert horse training plan generator. Always respond with valid JSON only.',
       jsonPrompt,
-      'llama-3.1-sonar-large-128k-online'
+      'sonar-pro'
     );
 
     // Clean up response (remove markdown code blocks if present)

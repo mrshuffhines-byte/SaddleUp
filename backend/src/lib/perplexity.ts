@@ -21,7 +21,7 @@ interface PerplexityResponse {
  */
 export async function callPerplexityAPI(
   messages: ChatMessage[],
-  model: string = 'llama-3.1-sonar-large-128k-online'
+  model: string = 'sonar'
 ): Promise<string> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   
@@ -62,7 +62,7 @@ export async function callPerplexityAPI(
 export async function callPerplexityWithPrompt(
   systemPrompt: string,
   userMessage: string,
-  model: string = 'llama-3.1-sonar-large-128k-online'
+  model: string = 'sonar'
 ): Promise<string> {
   return callPerplexityAPI([
     { role: 'system', content: systemPrompt },
