@@ -9,10 +9,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL, COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants';
-import Card from '../../components/Card';
-import EmptyState from '../../components/EmptyState';
-import Button from '../../components/Button';
+import { API_URL } from '../constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import Card from '../../components/ui/Card';
+import EmptyState from '../../components/ui/EmptyState';
+import Button from '../../components/ui/Button';
 
 interface Lesson {
   id: string;
@@ -112,7 +113,7 @@ export default function PlanScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -228,7 +229,7 @@ export default function PlanScreen() {
                   </Text>
                 </View>
                 <View style={styles.phaseProgressCircle}>
-                  <View style={[styles.circularProgress, { borderColor: COLORS.primary }]}>
+                  <View style={[styles.circularProgress, { borderColor: colors.primary[500] }]}>
                     <Text style={styles.circularProgressText}>{Math.round(phaseProgress)}%</Text>
                   </View>
                 </View>
@@ -335,117 +336,115 @@ function formatGoal(goal: string): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.neutral[50],
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.neutral[50],
   },
   headerCard: {
-    margin: SPACING.md,
-    marginBottom: SPACING.sm,
+    margin: spacing.md,
+    marginBottom: spacing.sm,
   },
   headerRow: {
-    marginBottom: SPACING.md,
+    marginBottom: spacing.md,
   },
   headerInfo: {
     flex: 1,
   },
   planId: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: COLORS.textTertiary,
+    ...typography.caption,
+    color: colors.neutral[500],
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: SPACING.xs,
+    marginBottom: spacing.xs,
   },
   planTitle: {
-    fontSize: TYPOGRAPHY.sizes.xl,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
+    ...typography.h2,
+    color: colors.neutral[900],
+    marginBottom: spacing.xs,
   },
   planGoal: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.textSecondary,
+    ...typography.body,
+    color: colors.neutral[600],
   },
   progressContainer: {
-    marginTop: SPACING.md,
+    marginTop: spacing.md,
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
+    marginBottom: spacing.sm,
   },
   progressLabel: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    color: COLORS.text,
+    ...typography.bodySmall,
+    fontWeight: '500',
+    color: colors.neutral[900],
   },
   progressPercentage: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.primary,
+    ...typography.bodySmall,
+    fontWeight: '600',
+    color: colors.primary[500],
   },
   progressBar: {
     height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: colors.neutral[200],
+    borderRadius: borderRadius.sm,
     overflow: 'hidden',
-    marginBottom: SPACING.xs,
+    marginBottom: spacing.xs,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.sm,
   },
   progressText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
+    ...typography.bodySmall,
+    color: colors.neutral[500],
   },
   phasesContainer: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
   },
   phaseCard: {
-    marginBottom: SPACING.md,
+    marginBottom: spacing.md,
     overflow: 'hidden',
   },
   phaseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    padding: spacing.md,
   },
   phaseIconBadge: {
     width: 48,
     height: 48,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceAlt,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary[100],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
+    marginRight: spacing.md,
   },
   phaseIconNumber: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.primary,
+    ...typography.h4,
+    fontWeight: '700',
+    color: colors.primary[700],
   },
   phaseInfo: {
     flex: 1,
   },
   phaseTitle: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs / 2,
+    ...typography.h3,
+    color: colors.neutral[900],
+    marginBottom: spacing.xs / 2,
   },
   phaseMeta: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
+    ...typography.bodySmall,
+    color: colors.neutral[500],
   },
   phaseProgressCircle: {
-    marginRight: SPACING.sm,
+    marginRight: spacing.sm,
   },
   circularProgress: {
     width: 48,
@@ -454,132 +453,132 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.neutral[50],
   },
   circularProgressText: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.primary,
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.primary[500],
   },
   expandIcon: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.textTertiary,
-    marginLeft: SPACING.xs,
+    ...typography.body,
+    color: colors.neutral[500],
+    marginLeft: spacing.xs,
   },
   phaseContent: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
   },
   moduleContainer: {
-    marginTop: SPACING.sm,
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: BORDER_RADIUS.md,
+    marginTop: spacing.sm,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
   moduleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    padding: spacing.md,
   },
   moduleIconBadge: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surface,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.neutral[50],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm,
+    marginRight: spacing.sm,
   },
   moduleIconNumber: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.primary,
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.primary[500],
   },
   moduleInfo: {
     flex: 1,
   },
   moduleTitle: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs / 2,
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.neutral[900],
+    marginBottom: spacing.xs / 2,
   },
   moduleMeta: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: COLORS.textTertiary,
+    ...typography.caption,
+    color: colors.neutral[500],
   },
   lessonsContainer: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
   lessonItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    marginTop: SPACING.sm,
-    ...SHADOWS.sm,
+    backgroundColor: colors.neutral[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    ...shadows.sm,
   },
   lessonComplete: {
-    backgroundColor: COLORS.successLight + '15', // 15% opacity
+    backgroundColor: colors.success + '15', // 15% opacity
     borderWidth: 1,
-    borderColor: COLORS.success,
+    borderColor: colors.success,
   },
   lessonIcon: {
-    marginRight: SPACING.md,
+    marginRight: spacing.md,
   },
   checkIcon: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.success,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.success,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkIconText: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.surface,
-    fontWeight: TYPOGRAPHY.weights.bold,
+    ...typography.body,
+    color: colors.neutral[50],
+    fontWeight: '700',
   },
   lessonNumberBadge: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceAlt,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.neutral[100],
     justifyContent: 'center',
     alignItems: 'center',
   },
   lessonNumberText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.primary,
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.primary[500],
   },
   lessonContent: {
     flex: 1,
   },
   lessonTitle: {
-    fontSize: TYPOGRAPHY.sizes.base,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    color: COLORS.text,
-    marginBottom: SPACING.xs / 2,
+    ...typography.body,
+    fontWeight: '500',
+    color: colors.neutral[900],
+    marginBottom: spacing.xs / 2,
   },
   lessonTitleComplete: {
     textDecorationLine: 'line-through',
-    color: COLORS.textTertiary,
+    color: colors.neutral[500],
   },
   lessonMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: spacing.sm,
   },
   lessonMetaText: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: COLORS.textTertiary,
+    ...typography.caption,
+    color: colors.neutral[500],
   },
   chevron: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    color: COLORS.textTertiary,
-    marginLeft: SPACING.sm,
+    ...typography.h3,
+    color: colors.neutral[500],
+    marginLeft: spacing.sm,
   },
 });
