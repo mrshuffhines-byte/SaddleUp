@@ -11,6 +11,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { API_URL } from './constants';
+import { colors, spacing, typography, borderRadius } from './theme';
+import Card from '../components/ui/Card';
+import { EmptyState } from '../components/ui';
 
 interface SavedAnswer {
   id: string;
@@ -77,29 +80,30 @@ export default function SavedAnswersScreen() {
   ];
 
   const renderAnswer = ({ item }: { item: SavedAnswer }) => (
-    <TouchableOpacity
-      style={styles.answerCard}
-      onPress={() => router.push(`/saved-answer/${item.id}`)}
-    >
-      <Text style={styles.question}>{item.question}</Text>
-      <Text style={styles.answerPreview} numberOfLines={2}>
-        {item.answer}
-      </Text>
-      <View style={styles.meta}>
-        {item.category && (
-          <Text style={styles.category}>{item.category}</Text>
-        )}
-        {item.method && (
-          <Text style={styles.method}>{item.method.name}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
+    <Card style={styles.answerCard}>
+      <TouchableOpacity onPress={() => router.push(`/saved-answer/${item.id}`)}>
+        <Text style={styles.question}>{item.question}</Text>
+        <Text style={styles.answerPreview} numberOfLines={2}>
+          {item.answer}
+        </Text>
+        <View style={styles.meta}>
+          {item.category && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.category}>{item.category}</Text>
+            </View>
+          )}
+          {item.method && (
+            <Text style={styles.method}>{item.method.name}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Card>
   );
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#8B7355" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -154,12 +158,13 @@ export default function SavedAnswersScreen() {
       </ScrollView>
 
       {answers.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No saved answers yet</Text>
-          <Text style={styles.emptySubtext}>
-            Save helpful answers from your conversations with the trainer
-          </Text>
-        </View>
+        <EmptyState
+          icon="💬"
+          title="No Saved Answers"
+          description="When you get helpful advice from the trainer, tap 'Save' to keep it here for reference."
+          actionLabel="Ask the Trainer"
+          onAction={() => router.push('/(tabs)/chat')}
+        />
       ) : (
         <FlatList
           data={answers}
@@ -175,101 +180,86 @@ export default function SavedAnswersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F1EA',
+    backgroundColor: colors.neutral[50],
   },
-  header: {
-    padding: 24,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#5A4A3A',
-  },
-  categoryScroll: {
-    maxHeight: 50,
-    marginBottom: 16,
-  },
-  categoryContainer: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
-  },
-  categoryButtonActive: {
-    backgroundColor: '#8B7355',
-    borderColor: '#8B7355',
-  },
-  categoryButtonText: {
-    fontSize: 14,
-    color: '#5A4A3A',
-  },
-  categoryButtonTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  list: {
-    padding: 16,
-  },
-  answerCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
-  },
-  question: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#8B7355',
-    marginBottom: 8,
-  },
-  answerPreview: {
-    fontSize: 16,
-    color: '#5A4A3A',
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  meta: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  category: {
-    fontSize: 14,
-    color: '#999',
-    backgroundColor: '#F5F1EA',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  method: {
-    fontSize: 14,
-    color: '#8B7355',
-    fontWeight: '500',
-  },
-  emptyState: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    backgroundColor: colors.neutral[50],
   },
-  emptyText: {
-    fontSize: 20,
+  header: {
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  title: {
+    ...typography.h1,
+    color: colors.neutral[900],
+  },
+  categoryScroll: {
+    maxHeight: 50,
+    marginBottom: spacing.md,
+  },
+  categoryContainer: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  categoryButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  categoryButtonActive: {
+    backgroundColor: colors.primary[500],
+    borderColor: colors.primary[500],
+  },
+  categoryButtonText: {
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+  },
+  categoryButtonTextActive: {
+    color: colors.surface,
     fontWeight: '600',
-    color: '#5A4A3A',
-    marginBottom: 8,
   },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
+  list: {
+    padding: spacing.md,
+  },
+  answerCard: {
+    marginBottom: spacing.md,
+  },
+  question: {
+    ...typography.h4,
+    color: colors.primary[500],
+    marginBottom: spacing.sm,
+  },
+  answerPreview: {
+    ...typography.body,
+    color: colors.neutral[700],
+    lineHeight: typography.body.lineHeight,
+    marginBottom: spacing.md,
+  },
+  meta: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  categoryBadge: {
+    backgroundColor: colors.neutral[100],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: borderRadius.sm,
+  },
+  category: {
+    ...typography.caption,
+    color: colors.neutral[600],
+  },
+  method: {
+    ...typography.bodySmall,
+    color: colors.primary[500],
+    fontWeight: '500',
   },
 });

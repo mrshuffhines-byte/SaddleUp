@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { API_URL } from '../constants';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
-import { Card, Button } from '../../components/ui';
+import { Card, Button, Toast } from '../../components/ui';
 
 interface TimestampReference {
   timestamp: string;
@@ -185,6 +185,20 @@ export default function ChatScreen() {
     }
   };
 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; visible: boolean }>({
+    message: '',
+    type: 'success',
+    visible: false,
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type, visible: true });
+  };
+
+  const hideToast = () => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  };
+
   const saveAnswer = async (question: string, answer: string) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -206,9 +220,9 @@ export default function ChatScreen() {
         throw new Error('Failed to save answer');
       }
 
-      Alert.alert('Success', 'Answer saved to your library!');
+      showToast('Answer saved to your library!', 'success');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save answer');
+      showToast(error.message || 'Failed to save answer', 'error');
     }
   };
 
@@ -406,6 +420,12 @@ export default function ChatScreen() {
       style={styles.container}
       keyboardVerticalOffset={90}
     >
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onHide={hideToast}
+      />
       <FlatList
         data={messages}
         renderItem={renderMessage}

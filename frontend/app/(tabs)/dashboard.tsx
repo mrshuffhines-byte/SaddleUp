@@ -16,7 +16,7 @@ import { API_URL } from '../constants';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import Card from '../../components/ui/Card';
 import StatCard from '../../components/StatCard';
-import { Button, ProgressBar } from '../../components/ui';
+import { Button, ProgressBar, EmptyState } from '../../components/ui';
 import { Badge } from '../../components/ui';
 
 interface User {
@@ -319,22 +319,13 @@ export default function DashboardScreen() {
           </Card>
         </Pressable>
       ) : !activePlan ? (
-        <Card style={styles.actionCard}>
-          <View style={styles.actionCardContent}>
-            <Text style={styles.actionCardIcon}>🎓</Text>
-            <Text style={styles.actionCardTitle}>Create Your Training Plan</Text>
-            <Text style={styles.actionCardDescription}>
-              Get started with a personalized AI-powered training plan tailored to
-              you, your horse, and your goals.
-            </Text>
-            <Button
-              title="Generate Plan"
-              onPress={() => router.push('/onboarding')}
-              style={styles.actionButton}
-              fullWidth
-            />
-          </View>
-        </Card>
+        <EmptyState
+          icon="📋"
+          title="No Training Plan Yet"
+          description="Let's create a personalized plan based on your goals and experience level."
+          actionLabel="Generate My Plan"
+          onAction={() => router.push('/onboarding')}
+        />
       ) : null}
 
       {/* Quick Actions */}

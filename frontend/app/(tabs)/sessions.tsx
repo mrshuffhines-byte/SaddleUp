@@ -9,6 +9,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { API_URL } from '../constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import Card from '../../components/ui/Card';
+import { EmptyState } from '../../components/ui';
 
 export default function SessionsScreen() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -48,8 +51,8 @@ export default function SessionsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#8B7355" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -60,11 +63,17 @@ export default function SessionsScreen() {
         <Text style={styles.title}>Session History</Text>
 
         {sessions.length === 0 ? (
-          <Text style={styles.emptyText}>No sessions logged yet</Text>
+          <EmptyState
+            icon="📝"
+            title="No Sessions Yet"
+            description="After you complete a lesson, log your training session to track your progress."
+            actionLabel="View Training Plan"
+            onAction={() => router.push('/(tabs)/plan')}
+          />
         ) : (
           sessions.map((session) => (
-            <View key={session.id} style={styles.sessionCard}>
-              <Text style={styles.sessionTitle}>{session.lesson.title}</Text>
+            <Card key={session.id} style={styles.sessionCard}>
+              <Text style={styles.sessionTitle}>{session.lesson?.title || 'Session'}</Text>
               <Text style={styles.sessionDate}>
                 {new Date(session.sessionDate).toLocaleDateString()}
               </Text>
@@ -77,7 +86,7 @@ export default function SessionsScreen() {
               {session.notes && (
                 <Text style={styles.sessionNotes}>{session.notes}</Text>
               )}
-            </View>
+            </Card>
           ))
         )}
       </View>
@@ -88,58 +97,52 @@ export default function SessionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F1EA',
+    backgroundColor: colors.neutral[50],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.neutral[50],
   },
   content: {
-    padding: 24,
+    padding: spacing.lg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#5A4A3A',
-    marginBottom: 24,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#999',
-    textAlign: 'center',
+    ...typography.h1,
+    color: colors.neutral[900],
+    marginBottom: spacing.lg,
   },
   sessionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
+    marginBottom: spacing.md,
   },
   sessionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#8B7355',
-    marginBottom: 8,
+    ...typography.h4,
+    color: colors.primary[500],
+    marginBottom: spacing.sm,
   },
   sessionDate: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 4,
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    marginBottom: spacing.xs,
   },
   sessionDuration: {
-    fontSize: 14,
-    color: '#5A4A3A',
-    marginBottom: 4,
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+    marginBottom: spacing.xs,
   },
   sessionRating: {
-    fontSize: 14,
-    color: '#5A4A3A',
-    marginBottom: 8,
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+    marginBottom: spacing.sm,
   },
   sessionNotes: {
-    fontSize: 14,
-    color: '#5A4A3A',
+    ...typography.body,
+    color: colors.neutral[700],
     fontStyle: 'italic',
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#D4C4B0',
+    borderTopColor: colors.neutral[200],
   },
 });

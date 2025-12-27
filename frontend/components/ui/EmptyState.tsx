@@ -1,30 +1,28 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing, typography } from '../../app/theme';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { colors, spacing, typography, borderRadius } from '../../app/theme';
 import Button from './Button';
 
 interface EmptyStateProps {
-  icon?: string;
+  icon: string; // emoji
   title: string;
-  description?: string;
+  description: string;
   actionLabel?: string;
   onAction?: () => void;
-  illustration?: React.ReactNode;
 }
 
 export default function EmptyState({
-  icon = '📋',
+  icon,
   title,
   description,
   actionLabel,
   onAction,
-  illustration,
 }: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      {illustration || <Text style={styles.icon}>{icon}</Text>}
+      <Text style={styles.icon}>{icon}</Text>
       <Text style={styles.title}>{title}</Text>
-      {description && <Text style={styles.description}>{description}</Text>}
+      <Text style={styles.description}>{description}</Text>
       {actionLabel && onAction && (
         <Button
           title={actionLabel}
@@ -51,6 +49,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h3,
+    fontWeight: typography.weights.bold,
     color: colors.neutral[900],
     textAlign: 'center',
     marginBottom: spacing.sm,
@@ -61,10 +60,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
     lineHeight: typography.body.lineHeight,
-    maxWidth: 300,
+    maxWidth: 400,
   },
   button: {
     marginTop: spacing.sm,
   },
 });
-
