@@ -3,7 +3,7 @@
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || (
   typeof __DEV__ !== 'undefined' && __DEV__ 
     ? 'http://localhost:3001'
-    : 'https://saddleup-backend-production.up.railway.app'
+    : 'https://api.thereinapp.com'
 );
 
 export const COLORS = {
