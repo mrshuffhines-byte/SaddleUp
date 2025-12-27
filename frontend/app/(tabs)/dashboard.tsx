@@ -162,7 +162,7 @@ export default function DashboardScreen() {
     loadData();
   };
 
-  const getPersonalizedMessage = (): string => {
+  const getPersonalizedMessage = (completedLessons: number): string => {
     if (sessions.length === 0) {
       return "Let's start your training journey today!";
     }
@@ -278,7 +278,7 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <Text style={styles.subGreeting}>{getPersonalizedMessage()}</Text>
+        <Text style={styles.subGreeting}>{getPersonalizedMessage(completedLessons)}</Text>
       </View>
 
       {/* Progress Card */}
