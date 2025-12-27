@@ -20,11 +20,10 @@ import Card from '../../components/ui/Card';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; code?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const router = useRouter();
   const fadeAnim = useState(new Animated.Value(0))[0];
 
@@ -41,7 +40,7 @@ export default function LoginScreen() {
     return emailRegex.test(email);
   };
 
-  const handleRequestCode = async () => {
+  const handleLogin = async () => {
     setErrors({});
     
     if (!email) {
@@ -54,46 +53,22 @@ export default function LoginScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to send login code');
-      }
-
-      setStep('code');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send login code');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    setErrors({});
-    
-    if (!code || code.length !== 6) {
-      setErrors({ code: 'Please enter the 6-digit code' });
+    if (!password) {
+      setErrors({ password: 'Password is required' });
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/verify`, {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Invalid code');
+        throw new Error(error.error || 'Login failed');
       }
 
       const { token, user } = await response.json();
@@ -106,8 +81,12 @@ export default function LoginScreen() {
         router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Invalid code. Please try again.');
-      setErrors({ code: error.message || 'Invalid code' });
+      Alert.alert('Error', error.message || 'Login failed. Please try again.');
+      if (error.message.toLowerCase().includes('password')) {
+        setErrors({ password: error.message });
+      } else if (error.message.toLowerCase().includes('email')) {
+        setErrors({ email: error.message });
+      }
     } finally {
       setLoading(false);
     }
@@ -135,85 +114,63 @@ export default function LoginScreen() {
           </Text>
 
           <Card style={styles.formCard}>
-            {step === 'email' ? (
-              <>
-                <Input
-                  label="Email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChangeText={(text) => {
-                    setEmail(text);
-                    if (errors.email) setErrors({ ...errors, email: undefined });
-                  }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  icon="📧"
-                  error={errors.email}
-                  containerStyle={styles.inputContainer}
-                />
+            <Input
+              label="Email"
+              placeholder="Enter your email"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) setErrors({ ...errors, email: undefined });
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              icon="📧"
+              error={errors.email}
+              containerStyle={styles.inputContainer}
+            />
 
-                <Button
-                  title="Send Login Code"
-                  onPress={handleRequestCode}
-                  loading={loading}
-                  style={styles.button}
-                  fullWidth
-                />
+            <View style={styles.passwordContainer}>
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errors.password) setErrors({ ...errors, password: undefined });
+                }}
+                secureTextEntry={!showPassword}
+                icon="🔒"
+                error={errors.password}
+                containerStyle={styles.inputContainer}
+                rightIcon={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                  >
+                    <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  </TouchableOpacity>
+                }
+              />
+            </View>
 
-                <TouchableOpacity 
-                  style={styles.forgotPasswordLink}
-                  onPress={() => {
-                    // TODO: Implement forgot password flow
-                    Alert.alert('Forgot Password', 'Please contact support or try logging in again.');
-                  }}
-                >
-                  <Text style={styles.forgotPasswordText}>Forgot your email?</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.codeInstructions}>
-                  We sent a 6-digit code to{'\n'}
-                  <Text style={styles.emailText}>{email}</Text>
-                </Text>
+            <TouchableOpacity 
+              style={styles.forgotPasswordLink}
+              onPress={() => {
+                // TODO: Implement forgot password flow
+                Alert.alert('Forgot Password', 'Please contact support or try logging in again.');
+              }}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
 
-                <Input
-                  label="Verification Code"
-                  placeholder="Enter 6-digit code"
-                  value={code}
-                  onChangeText={(text) => {
-                    const numericCode = text.replace(/[^0-9]/g, '').slice(0, 6);
-                    setCode(numericCode);
-                    if (errors.code) setErrors({ ...errors, code: undefined });
-                  }}
-                  keyboardType="number-pad"
-                  icon="🔒"
-                  error={errors.code}
-                  containerStyle={styles.inputContainer}
-                  maxLength={6}
-                />
-
-                <Button
-                  title="Sign In"
-                  onPress={handleVerifyCode}
-                  loading={loading}
-                  style={styles.button}
-                  fullWidth
-                />
-
-                <TouchableOpacity 
-                  style={styles.backLink}
-                  onPress={() => {
-                    setStep('email');
-                    setCode('');
-                    setErrors({});
-                  }}
-                >
-                  <Text style={styles.backLinkText}>← Change email</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            <Button
+              title="Sign In"
+              onPress={handleLogin}
+              loading={loading}
+              style={styles.button}
+              fullWidth
+            />
           </Card>
 
           {/* Signup Link */}
@@ -271,36 +228,27 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: spacing.md,
   },
+  passwordContainer: {
+    position: 'relative',
+  },
+  eyeButton: {
+    padding: spacing.xs,
+  },
+  eyeIconText: {
+    fontSize: 20,
+  },
   button: {
     marginTop: spacing.md,
   },
   forgotPasswordLink: {
-    marginTop: spacing.md,
-    alignItems: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    alignItems: 'flex-end',
   },
   forgotPasswordText: {
     ...typography.bodySmall,
     color: colors.primary[600],
     textDecorationLine: 'underline',
-  },
-  codeInstructions: {
-    ...typography.body,
-    color: colors.neutral[700],
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-    lineHeight: typography.body.lineHeight,
-  },
-  emailText: {
-    fontWeight: '600',
-    color: colors.neutral[900],
-  },
-  backLink: {
-    marginTop: spacing.md,
-    alignItems: 'center',
-  },
-  backLinkText: {
-    ...typography.bodySmall,
-    color: colors.primary[600],
   },
   signupContainer: {
     flexDirection: 'row',
