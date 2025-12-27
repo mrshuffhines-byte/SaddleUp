@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +14,7 @@ import { API_URL } from '../constants';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
-import Button from '../../components/ui/Button';
+import { ProgressBar } from '../../components/ui';
 
 interface Lesson {
   id: string;
@@ -31,12 +32,15 @@ interface Plan {
   visibleIdDisplay: string;
   name?: string;
   goal: string;
+  generatedContent?: any;
   lessons: Lesson[];
 }
 
 interface Phase {
   phaseNumber: number;
   title?: string;
+  description?: string;
+  icon?: string;
   modules: Module[];
 }
 
@@ -46,10 +50,19 @@ interface Module {
   lessons: Lesson[];
 }
 
+type LessonStatus = 'completed' | 'current' | 'locked';
+
+const PHASE_ICONS = ['🌱', '🌿', '🌳'];
+const PHASE_TITLES = ['Foundation', 'Building Skills', 'Refinement'];
+const PHASE_DESCRIPTIONS = [
+  'Master the basics and build confidence',
+  'Develop core skills and techniques',
+  'Refine and perfect your horsemanship',
+];
+
 export default function PlanScreen() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set([1])); // Expand first phase by default
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const router = useRouter();
 
@@ -77,21 +90,22 @@ export default function PlanScreen() {
 
       const data = await response.json();
       setPlan(data);
+      
+      // Expand first module of first phase by default
+      if (data.lessons && data.lessons.length > 0) {
+        const firstPhase = Math.min(...data.lessons.map((l: Lesson) => l.phaseNumber));
+        const firstModule = Math.min(
+          ...data.lessons
+            .filter((l: Lesson) => l.phaseNumber === firstPhase)
+            .map((l: Lesson) => l.moduleNumber)
+        );
+        setExpandedModules(new Set([`${firstPhase}-${firstModule}`]));
+      }
     } catch (error) {
       console.error('Load plan error:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const togglePhase = (phaseNumber: number) => {
-    const newExpanded = new Set(expandedPhases);
-    if (newExpanded.has(phaseNumber)) {
-      newExpanded.delete(phaseNumber);
-    } else {
-      newExpanded.add(phaseNumber);
-    }
-    setExpandedPhases(newExpanded);
   };
 
   const toggleModule = (phaseNumber: number, moduleNumber: number) => {
@@ -106,8 +120,42 @@ export default function PlanScreen() {
   };
 
   const getLessonDuration = (lesson: Lesson): number => {
-    // Extract duration from lesson content if available, default to 30
     return lesson.content?.duration || 30;
+  };
+
+  const getLessonStatus = (lesson: Lesson, allLessons: Lesson[]): LessonStatus => {
+    if (lesson.isCompleted) {
+      return 'completed';
+    }
+
+    // Find all lessons before this one
+    const previousLessons = allLessons.filter((l) => {
+      if (l.phaseNumber < lesson.phaseNumber) return true;
+      if (l.phaseNumber === lesson.phaseNumber && l.moduleNumber < lesson.moduleNumber) return true;
+      if (
+        l.phaseNumber === lesson.phaseNumber &&
+        l.moduleNumber === lesson.moduleNumber &&
+        l.lessonNumber < lesson.lessonNumber
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    // Check if all previous lessons are completed
+    const allPreviousCompleted = previousLessons.every((l) => l.isCompleted);
+
+    if (allPreviousCompleted) {
+      return 'current';
+    }
+
+    return 'locked';
+  };
+
+  const calculateEstimatedWeeks = (totalLessons: number, daysPerWeek: number): number => {
+    if (daysPerWeek === 0) return 0;
+    const lessonsPerWeek = daysPerWeek;
+    return Math.ceil(totalLessons / lessonsPerWeek);
   };
 
   if (loading) {
@@ -134,150 +182,139 @@ export default function PlanScreen() {
 
   // Group lessons by phase and module
   const phasesMap = new Map<number, Phase>();
-  
+
   plan.lessons.forEach((lesson) => {
     if (!phasesMap.has(lesson.phaseNumber)) {
       phasesMap.set(lesson.phaseNumber, {
         phaseNumber: lesson.phaseNumber,
+        title: PHASE_TITLES[lesson.phaseNumber - 1] || `Phase ${lesson.phaseNumber}`,
+        description: PHASE_DESCRIPTIONS[lesson.phaseNumber - 1],
+        icon: PHASE_ICONS[lesson.phaseNumber - 1] || '📚',
         modules: [],
       });
     }
-    
+
     const phase = phasesMap.get(lesson.phaseNumber)!;
-    let module = phase.modules.find(m => m.moduleNumber === lesson.moduleNumber);
-    
+    let module = phase.modules.find((m) => m.moduleNumber === lesson.moduleNumber);
+
     if (!module) {
       module = {
         moduleNumber: lesson.moduleNumber,
+        title: `Module ${lesson.moduleNumber}`,
         lessons: [],
       };
       phase.modules.push(module);
     }
-    
+
     module.lessons.push(lesson);
   });
 
   // Sort and organize
   const phases = Array.from(phasesMap.values())
     .sort((a, b) => a.phaseNumber - b.phaseNumber)
-    .map(phase => ({
+    .map((phase) => ({
       ...phase,
       modules: phase.modules.sort((a, b) => a.moduleNumber - b.moduleNumber),
     }));
 
   // Calculate progress
-  const completedLessons = plan.lessons.filter(l => l.isCompleted).length;
+  const completedLessons = plan.lessons.filter((l) => l.isCompleted).length;
   const totalLessons = plan.lessons.length;
   const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
-  // Calculate phase progress
-  const getPhaseProgress = (phase: Phase) => {
-    const phaseLessons = phase.modules.flatMap(m => m.lessons);
-    const completed = phaseLessons.filter(l => l.isCompleted).length;
-    return phaseLessons.length > 0 ? (completed / phaseLessons.length) * 100 : 0;
+  // Calculate estimated weeks (assuming user's daysPerWeek from profile)
+  const daysPerWeek = plan.generatedContent?.daysPerWeek || 3;
+  const estimatedWeeksLeft = calculateEstimatedWeeks(
+    totalLessons - completedLessons,
+    daysPerWeek
+  );
+
+  const formatGoal = (goal: string): string => {
+    const goalMap: Record<string, string> = {
+      learn_to_ride: 'Learn to Ride',
+      learn_to_drive: 'Learn to Drive',
+      groundwork_only: 'Groundwork Only',
+      general_horsemanship: 'General Horsemanship',
+    };
+    return goalMap[goal] || goal;
   };
 
   return (
     <ScrollView style={styles.container}>
       {/* Plan Header */}
-      <Card style={styles.headerCard}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerInfo}>
-            <Text style={styles.planId}>Plan {plan.visibleIdDisplay}</Text>
-            <Text style={styles.planTitle}>{plan.name || 'Your Training Journey'}</Text>
-            <Text style={styles.planGoal}>Goal: {formatGoal(plan.goal)}</Text>
-          </View>
-        </View>
-
-        {/* Overall Progress */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Overall Progress</Text>
-            <Text style={styles.progressPercentage}>{Math.round(progressPercentage)}%</Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-          </View>
-          <Text style={styles.progressText}>
-            {completedLessons} of {totalLessons} lessons completed
-          </Text>
-        </View>
+      <Card style={styles.planHeaderCard}>
+        <Text style={styles.planTitle}>{formatGoal(plan.goal)} Training Plan</Text>
+        <ProgressBar
+          progress={progressPercentage}
+          showLabel={false}
+          style={styles.progressBar}
+        />
+        <Text style={styles.progressSubtext}>
+          {completedLessons} of {totalLessons} lessons • ~{estimatedWeeksLeft} weeks remaining
+        </Text>
       </Card>
 
       {/* Phases */}
       <View style={styles.phasesContainer}>
         {phases.map((phase) => {
-          const phaseExpanded = expandedPhases.has(phase.phaseNumber);
-          const phaseProgress = getPhaseProgress(phase);
-          const phaseLessons = phase.modules.flatMap(m => m.lessons);
-          const phaseCompleted = phaseLessons.filter(l => l.isCompleted).length;
+          const phaseCompleted = phase.modules
+            .flatMap((m) => m.lessons)
+            .filter((l) => l.isCompleted).length;
+          const phaseTotal = phase.modules.flatMap((m) => m.lessons).length;
 
           return (
             <Card key={phase.phaseNumber} style={styles.phaseCard}>
-              <TouchableOpacity
-                style={styles.phaseHeader}
-                onPress={() => togglePhase(phase.phaseNumber)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.phaseIconBadge}>
-                  <Text style={styles.phaseIconNumber}>{phase.phaseNumber}</Text>
-                </View>
-                <View style={styles.phaseInfo}>
-                  <Text style={styles.phaseTitle}>Phase {phase.phaseNumber}</Text>
-                  <Text style={styles.phaseMeta}>
-                    {phaseCompleted}/{phaseLessons.length} lessons · ~{Math.round(phaseLessons.reduce((sum, l) => sum + getLessonDuration(l), 0) / 60)}h
+              <View style={styles.phaseHeader}>
+                <Text style={styles.phaseIcon}>{phase.icon}</Text>
+                <View style={styles.phaseHeaderContent}>
+                  <Text style={styles.phaseTitle}>{phase.title}</Text>
+                  <Text style={styles.phaseDescription}>{phase.description}</Text>
+                  <Text style={styles.phaseProgress}>
+                    {phaseCompleted} of {phaseTotal} lessons completed
                   </Text>
                 </View>
-                <View style={styles.phaseProgressCircle}>
-                  <View style={[styles.circularProgress, { borderColor: colors.primary[500] }]}>
-                    <Text style={styles.circularProgressText}>{Math.round(phaseProgress)}%</Text>
-                  </View>
-                </View>
-                <Text style={styles.expandIcon}>{phaseExpanded ? '▼' : '▶'}</Text>
-              </TouchableOpacity>
+              </View>
 
-              {phaseExpanded && (
-                <View style={styles.phaseContent}>
-                  {phase.modules.map((module) => {
-                    const moduleKey = `${phase.phaseNumber}-${module.moduleNumber}`;
-                    const moduleExpanded = expandedModules.has(moduleKey);
-                    const moduleCompleted = module.lessons.filter(l => l.isCompleted).length;
+              {phase.modules.map((module) => {
+                const moduleKey = `${phase.phaseNumber}-${module.moduleNumber}`;
+                const moduleExpanded = expandedModules.has(moduleKey);
+                const moduleCompleted = module.lessons.filter((l) => l.isCompleted).length;
 
-                    return (
-                      <View key={module.moduleNumber} style={styles.moduleContainer}>
-                        <TouchableOpacity
-                          style={styles.moduleHeader}
-                          onPress={() => toggleModule(phase.phaseNumber, module.moduleNumber)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.moduleIconBadge}>
-                            <Text style={styles.moduleIconNumber}>{module.moduleNumber}</Text>
-                          </View>
-                          <View style={styles.moduleInfo}>
-                            <Text style={styles.moduleTitle}>Module {module.moduleNumber}</Text>
-                            <Text style={styles.moduleMeta}>
-                              {moduleCompleted}/{module.lessons.length} lessons
-                            </Text>
-                          </View>
-                          <Text style={styles.expandIcon}>{moduleExpanded ? '▼' : '▶'}</Text>
-                        </TouchableOpacity>
-
-                        {moduleExpanded && (
-                          <View style={styles.lessonsContainer}>
-                            {module.lessons.map((lesson) => (
-                              <LessonItem
-                                key={lesson.id}
-                                lesson={lesson}
-                                onPress={() => router.push(`/lesson/${lesson.lessonId}`)}
-                              />
-                            ))}
-                          </View>
-                        )}
+                return (
+                  <View key={module.moduleNumber} style={styles.module}>
+                    <Pressable
+                      style={styles.moduleHeader}
+                      onPress={() => toggleModule(phase.phaseNumber, module.moduleNumber)}
+                      android_ripple={{ color: colors.primary[100] }}
+                    >
+                      <View style={styles.moduleHeaderContent}>
+                        <Text style={styles.moduleTitle}>
+                          Module {module.moduleNumber}
+                        </Text>
+                        <Text style={styles.moduleProgress}>
+                          {moduleCompleted}/{module.lessons.length} lessons
+                        </Text>
                       </View>
-                    );
-                  })}
-                </View>
-              )}
+                      <Text style={styles.chevron}>{moduleExpanded ? '▼' : '▶'}</Text>
+                    </Pressable>
+
+                    {moduleExpanded && (
+                      <View style={styles.lessonList}>
+                        {module.lessons
+                          .sort((a, b) => a.lessonNumber - b.lessonNumber)
+                          .map((lesson) => (
+                            <LessonRow
+                              key={lesson.id}
+                              lesson={lesson}
+                              status={getLessonStatus(lesson, plan.lessons)}
+                              onPress={() => router.push(`/lesson/${lesson.lessonId}`)}
+                            />
+                          ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </Card>
           );
         })}
@@ -286,51 +323,66 @@ export default function PlanScreen() {
   );
 }
 
-function LessonItem({ lesson, onPress }: { lesson: Lesson; onPress: () => void }) {
-  const isComplete = lesson.isCompleted;
+function LessonRow({
+  lesson,
+  status,
+  onPress,
+}: {
+  lesson: Lesson;
+  status: LessonStatus;
+  onPress: () => void;
+}) {
+  const statusStyles = {
+    completed: { icon: '✓', color: colors.success, bg: colors.success + '20' },
+    current: { icon: '→', color: colors.accent[500], bg: colors.accent[500] + '20' },
+    locked: { icon: '○', color: colors.neutral[400], bg: 'transparent' },
+  };
+
   const duration = lesson.content?.duration || 30;
+  const statusStyle = statusStyles[status];
 
   return (
-    <TouchableOpacity
+    <Pressable
       style={[
-        styles.lessonItem,
-        isComplete && styles.lessonComplete,
+        styles.lessonRow,
+        status === 'current' && styles.currentLesson,
+        status === 'locked' && styles.lockedLesson,
       ]}
-      onPress={onPress}
-      activeOpacity={0.7}
+      onPress={status !== 'locked' ? onPress : undefined}
+      disabled={status === 'locked'}
+      android_ripple={
+        status !== 'locked' ? { color: colors.primary[100] } : undefined
+      }
     >
-      <View style={styles.lessonIcon}>
-        {isComplete ? (
-          <View style={styles.checkIcon}>
-            <Text style={styles.checkIconText}>✓</Text>
-          </View>
-        ) : (
-          <View style={styles.lessonNumberBadge}>
-            <Text style={styles.lessonNumberText}>{lesson.lessonNumber}</Text>
-          </View>
-        )}
+      <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+        <Text style={[styles.statusIcon, { color: statusStyle.color }]}>
+          {statusStyle.icon}
+        </Text>
       </View>
-      <View style={styles.lessonContent}>
-        <Text style={[styles.lessonTitle, isComplete && styles.lessonTitleComplete]}>
+      <View style={styles.lessonInfo}>
+        <Text
+          style={[
+            styles.lessonTitle,
+            status === 'locked' && styles.lockedText,
+            status === 'completed' && styles.completedText,
+          ]}
+        >
           {lesson.title}
         </Text>
-        <View style={styles.lessonMeta}>
-          <Text style={styles.lessonMetaText}>⏱ {duration} min</Text>
-        </View>
+        <Text style={styles.lessonMeta}>~{duration} min</Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
+      {status === 'current' && (
+        <View style={styles.startButton}>
+          <Text style={styles.startButtonText}>Start</Text>
+        </View>
+      )}
+      {status === 'completed' && (
+        <View style={styles.completedBadge}>
+          <Text style={styles.completedBadgeText}>Done</Text>
+        </View>
+      )}
+    </Pressable>
   );
-}
-
-function formatGoal(goal: string): string {
-  const goalMap: Record<string, string> = {
-    learn_to_ride: 'Learn to Ride',
-    learn_to_drive: 'Learn to Drive',
-    groundwork_only: 'Groundwork Only',
-    general_horsemanship: 'General Horsemanship',
-  };
-  return goalMap[goal] || goal;
 }
 
 const styles = StyleSheet.create({
@@ -344,217 +396,117 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.neutral[50],
   },
-  headerCard: {
-    margin: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  headerRow: {
+  planHeaderCard: {
+    margin: spacing.lg,
     marginBottom: spacing.md,
   },
-  headerInfo: {
-    flex: 1,
-  },
-  planId: {
-    ...typography.caption,
-    color: colors.neutral[500],
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.xs,
-  },
   planTitle: {
-    ...typography.h2,
+    ...typography.h1,
     color: colors.neutral[900],
-    marginBottom: spacing.xs,
-  },
-  planGoal: {
-    ...typography.body,
-    color: colors.neutral[600],
-  },
-  progressContainer: {
-    marginTop: spacing.md,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  progressLabel: {
-    ...typography.bodySmall,
-    fontWeight: '500',
-    color: colors.neutral[900],
-  },
-  progressPercentage: {
-    ...typography.bodySmall,
-    fontWeight: '600',
-    color: colors.primary[500],
+    marginBottom: spacing.md,
   },
   progressBar: {
-    height: 8,
-    backgroundColor: colors.neutral[200],
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary[500],
-    borderRadius: borderRadius.sm,
-  },
-  progressText: {
+  progressSubtext: {
     ...typography.bodySmall,
-    color: colors.neutral[500],
+    color: colors.neutral[600],
   },
   phasesContainer: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
   phaseCard: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     overflow: 'hidden',
   },
   phaseHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
   },
-  phaseIconBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary[100],
-    justifyContent: 'center',
-    alignItems: 'center',
+  phaseIcon: {
+    fontSize: 48,
     marginRight: spacing.md,
   },
-  phaseIconNumber: {
-    ...typography.h4,
-    fontWeight: '700',
-    color: colors.primary[700],
-  },
-  phaseInfo: {
+  phaseHeaderContent: {
     flex: 1,
   },
   phaseTitle: {
-    ...typography.h3,
+    ...typography.h2,
     color: colors.neutral[900],
     marginBottom: spacing.xs / 2,
   },
-  phaseMeta: {
+  phaseDescription: {
+    ...typography.body,
+    color: colors.neutral[600],
+    marginBottom: spacing.xs,
+  },
+  phaseProgress: {
     ...typography.bodySmall,
     color: colors.neutral[500],
   },
-  phaseProgressCircle: {
-    marginRight: spacing.sm,
-  },
-  circularProgress: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.neutral[50],
-  },
-  circularProgressText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.primary[500],
-  },
-  expandIcon: {
-    ...typography.body,
-    color: colors.neutral[500],
-    marginLeft: spacing.xs,
-  },
-  phaseContent: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  moduleContainer: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.neutral[100],
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
+  module: {
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
   },
   moduleHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
-  moduleIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.neutral[50],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  moduleIconNumber: {
-    ...typography.bodySmall,
-    fontWeight: '700',
-    color: colors.primary[500],
-  },
-  moduleInfo: {
+  moduleHeaderContent: {
     flex: 1,
   },
   moduleTitle: {
-    ...typography.body,
-    fontWeight: '600',
+    ...typography.h4,
     color: colors.neutral[900],
     marginBottom: spacing.xs / 2,
   },
-  moduleMeta: {
+  moduleProgress: {
     ...typography.caption,
     color: colors.neutral[500],
   },
-  lessonsContainer: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+  chevron: {
+    ...typography.body,
+    color: colors.neutral[500],
+    marginLeft: spacing.sm,
   },
-  lessonItem: {
+  lessonList: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  lessonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.neutral[50],
-    borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginTop: spacing.sm,
-    ...shadows.sm,
+    marginBottom: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.neutral[50],
   },
-  lessonComplete: {
-    backgroundColor: colors.success + '15', // 15% opacity
+  currentLesson: {
+    backgroundColor: colors.accent[500] + '10',
     borderWidth: 1,
-    borderColor: colors.success,
+    borderColor: colors.accent[500] + '30',
   },
-  lessonIcon: {
+  lockedLesson: {
+    opacity: 0.6,
+  },
+  statusBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: spacing.md,
   },
-  checkIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.success,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkIconText: {
-    ...typography.body,
-    color: colors.neutral[50],
+  statusIcon: {
+    fontSize: 18,
     fontWeight: '700',
   },
-  lessonNumberBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.neutral[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lessonNumberText: {
-    ...typography.bodySmall,
-    fontWeight: '700',
-    color: colors.primary[500],
-  },
-  lessonContent: {
+  lessonInfo: {
     flex: 1,
   },
   lessonTitle: {
@@ -563,22 +515,39 @@ const styles = StyleSheet.create({
     color: colors.neutral[900],
     marginBottom: spacing.xs / 2,
   },
-  lessonTitleComplete: {
+  completedText: {
     textDecorationLine: 'line-through',
     color: colors.neutral[500],
   },
-  lessonMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  lockedText: {
+    color: colors.neutral[400],
   },
-  lessonMetaText: {
+  lessonMeta: {
     ...typography.caption,
     color: colors.neutral[500],
   },
-  chevron: {
-    ...typography.h3,
-    color: colors.neutral[500],
+  startButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.accent[500],
+    borderRadius: borderRadius.md,
     marginLeft: spacing.sm,
+  },
+  startButtonText: {
+    ...typography.bodySmall,
+    color: colors.neutral[50],
+    fontWeight: '600',
+  },
+  completedBadge: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.success + '20',
+    borderRadius: borderRadius.md,
+    marginLeft: spacing.sm,
+  },
+  completedBadgeText: {
+    ...typography.caption,
+    color: colors.success,
+    fontWeight: '600',
   },
 });
