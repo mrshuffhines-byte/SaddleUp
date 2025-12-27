@@ -18,7 +18,7 @@ model User {
   name             String?
   createdAt        DateTime              @default(now())
   profile          UserProfile?
-  trainingPlan     TrainingPlan?
+  trainingPlans    TrainingPlan[]
   sessions         Session[]
   userSkills       UserSkill[]
   conversations    Conversation[]
@@ -44,18 +44,22 @@ model UserProfile {
 }
 
 model TrainingPlan {
-  id               String   @id @default(cuid())
-  visibleId        String   @unique
+  id               String      @id @default(cuid())
+  visibleId        String      @unique
   visibleIdDisplay String
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   goal             String
   generatedContent Json // Store the full AI-generated plan structure
-  currentPhase     Int      @default(1)
-  currentModule    Int      @default(1)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  currentPhase     Int         @default(1)
+  currentModule    Int         @default(1)
+  name             String?
+  description      String?
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
   lessons          Lesson[]
+  planHorses       PlanHorse[]
 }
 
 model Lesson {
@@ -207,11 +211,11 @@ model SavedAnswer {
 }
 
 model Horse {
-  id               String    @id @default(cuid())
-  visibleId        String    @unique
+  id               String      @id @default(cuid())
+  visibleId        String      @unique
   visibleIdDisplay String
   userId           String
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name             String
   breed            String?
   age              String? // foal, yearling, 2-3yo, 4-10yo, 11-17yo, 18+ senior
@@ -230,11 +234,26 @@ model Horse {
   goodWith         Json? // Array of things horse handles well
   struggles        Json? // Array of things horse finds difficult
   notes            String?
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
   sessions         Session[]
   lessons          Lesson[]
+  planHorses       PlanHorse[]
+}
+
+model PlanHorse {
+  id           String       @id @default(cuid())
+  planId       String
+  trainingPlan TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  horseId      String
+  horse        Horse        @relation(fields: [horseId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime     @default(now())
+  isActive     Boolean      @default(true)
+
+  @@unique([planId, horseId])
+  @@index([planId])
+  @@index([horseId])
 }
 
 model Facility {
