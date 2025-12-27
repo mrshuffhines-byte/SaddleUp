@@ -30,14 +30,23 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
     }
 
     // Generate plan with AI
-    const planData = await generateTrainingPlan({
-      experienceLevel: profile.experienceLevel,
-      primaryGoal: profile.primaryGoal,
-      daysPerWeek: profile.daysPerWeek,
-      sessionLength: profile.sessionLength,
-      ownsHorse: profile.ownsHorse,
-      horseDetails: profile.horseDetails || undefined,
-    });
+    let planData;
+    try {
+      planData = await generateTrainingPlan({
+        experienceLevel: profile.experienceLevel,
+        primaryGoal: profile.primaryGoal,
+        daysPerWeek: profile.daysPerWeek,
+        sessionLength: profile.sessionLength,
+        ownsHorse: profile.ownsHorse,
+        horseDetails: profile.horseDetails || undefined,
+      });
+    } catch (error) {
+      console.error('Training plan generation error:', error);
+      return res.status(500).json({ 
+        error: 'Failed to generate training plan',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
 
     // Create visible ID (human-readable)
     const visibleId = generateVisibleId();
@@ -97,7 +106,11 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
     res.json(completePlan);
   } catch (error) {
     console.error('Generate plan error:', error);
-    res.status(500).json({ error: 'Failed to generate training plan' });
+    res.status(500).json({ 
+      error: 'Failed to generate training plan',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+    });
   }
 });
 

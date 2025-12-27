@@ -114,7 +114,7 @@ Make sure the JSON is valid and parseable.`;
     // Use a prompt that instructs Perplexity to return JSON
     const jsonPrompt = `${prompt}\n\nPlease respond with ONLY valid JSON, no additional text or markdown formatting.`;
       
-      const responseText = await callPerplexityWithPrompt(
+    const responseText = await callPerplexityWithPrompt(
       'You are an expert horse training plan generator. Always respond with valid JSON only.',
       jsonPrompt,
       'sonar-pro'
@@ -127,14 +127,31 @@ Make sure the JSON is valid and parseable.`;
     } else if (cleanedResponse.startsWith('```')) {
       cleanedResponse = cleanedResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
+    cleanedResponse = cleanedResponse.trim();
 
-    const plan = JSON.parse(cleanedResponse) as TrainingPlanStructure;
-    return plan;
+    try {
+      const plan = JSON.parse(cleanedResponse) as TrainingPlanStructure;
+      
+      // Validate the structure
+      if (!plan.phases || !Array.isArray(plan.phases) || plan.phases.length === 0) {
+        console.error('Invalid plan structure: missing phases', plan);
+        throw new Error('Invalid training plan structure: no phases found');
+      }
+      
+      return plan;
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Response text (first 500 chars):', cleanedResponse.substring(0, 500));
+      throw new Error(`Failed to parse training plan JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+    }
   } catch (error) {
     console.error('Error generating training plan:', error);
-    if (error instanceof SyntaxError) {
-      throw new Error('Failed to parse training plan JSON');
+    if (error instanceof Error && error.message.includes('parse')) {
+      throw error;
     }
-    throw new Error('Failed to generate training plan');
+    if (error instanceof SyntaxError) {
+      throw new Error(`Failed to parse training plan JSON: ${error.message}`);
+    }
+    throw new Error(`Failed to generate training plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

@@ -43,8 +43,15 @@ export async function callPerplexityAPI(
 
   if (!response.ok) {
     const errorText = await response.text();
+    let errorMessage = `Perplexity API error: ${response.status}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage += ` - ${errorJson.error?.message || errorJson.message || errorText}`;
+    } catch {
+      errorMessage += ` - ${errorText.substring(0, 200)}`;
+    }
     console.error('Perplexity API error:', response.status, errorText);
-    throw new Error(`Perplexity API error: ${response.status} - ${errorText}`);
+    throw new Error(errorMessage);
   }
 
   const data = await response.json() as PerplexityResponse;
