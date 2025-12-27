@@ -172,7 +172,7 @@ export async function checkAndUnlockSkills(userId: string): Promise<string[]> {
     }
 
     // Check if user has completed relevant lessons
-    const relevantLessons = completedLessons.filter(lesson => {
+    const relevantLessons = completedLessons.filter((lesson: any) => {
       const lessonContent = lesson.content as any;
       const titleLower = lesson.title.toLowerCase();
       const contentLower = JSON.stringify(lessonContent).toLowerCase();
