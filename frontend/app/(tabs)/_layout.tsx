@@ -1,18 +1,19 @@
 import { Tabs } from 'expo-router';
+import { COLORS } from '../constants';
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#8B7355',
+          backgroundColor: COLORS.primary,
         },
-        headerTintColor: '#fff',
-        tabBarActiveTintColor: '#8B7355',
-        tabBarInactiveTintColor: '#999',
+        headerTintColor: COLORS.surface,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textTertiary,
         tabBarStyle: {
-          backgroundColor: '#F5F1EA',
-          borderTopColor: '#D4C4B0',
+          backgroundColor: COLORS.background,
+          borderTopColor: COLORS.border,
         },
       }}
     >
@@ -21,6 +22,7 @@ export default function TabsLayout() {
         options={{
           title: 'Dashboard',
           tabBarLabel: 'Home',
+          headerShown: false, // Hide header since dashboard has its own hero section
         }}
       />
       <Tabs.Screen
