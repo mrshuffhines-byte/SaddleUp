@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "SaddleUp",
+    "slug": "saddleup",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#8B7355"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.saddleup.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#8B7355"
+      },
+      "package": "com.saddleup.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static",
+      "name": "SaddleUp",
+      "shortName": "SaddleUp",
+      "lang": "en",
+      "scope": "/",
+      "themeColor": "#8B7355",
+      "backgroundColor": "#F5F1EA",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "description": "AI-powered horse training app for beginner horse owners"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "saddleup",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "saddleup-project"
+      }
+    }
+  }
+}

@@ -1,0 +1,265 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String                @id @default(cuid())
+  email             String                @unique
+  passwordHash      String
+  name              String?
+  createdAt         DateTime              @default(now())
+  profile           UserProfile?
+  trainingPlan      TrainingPlan?
+  sessions          Session[]
+  userSkills        UserSkill[]
+  conversations     Conversation[]
+  savedAnswers      SavedAnswer[]
+  mediaUploads      MediaUpload[]
+  methodPreference  UserMethodPreference?
+  horses            Horse[]
+  facilities        Facility[]
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experienceLevel String
+  primaryGoal   String
+  daysPerWeek   Int
+  sessionLength Int      // in minutes
+  ownsHorse     Boolean
+  horseDetails  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TrainingPlan {
+  id               String   @id @default(cuid())
+  visibleId        String   @unique
+  visibleIdDisplay String
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal             String
+  generatedContent Json     // Store the full AI-generated plan structure
+  currentPhase     Int      @default(1)
+  currentModule    Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lessons          Lesson[]
+}
+
+model Lesson {
+  id           String   @id @default(cuid())
+  lessonId     String   @unique // Human-readable ID like "F1-M1-L1"
+  lessonTitle  String
+  planId       String
+  plan         TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  phaseNumber  Int
+  moduleNumber Int
+  lessonNumber Int
+  title        String
+  content      Json     // Lesson details: objective, equipment, instructions, etc.
+  isCompleted  Boolean  @default(false)
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  sessions     Session[]
+  horseId      String?  // Optional: if lesson is horse-specific
+  horse        Horse?   @relation(fields: [horseId], references: [id], onDelete: SetNull)
+}
+
+model Session {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId              String
+  lesson                Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  horseId               String?
+  horse                 Horse?   @relation(fields: [horseId], references: [id], onDelete: SetNull)
+  facilityId            String?
+  facility              Facility? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  sessionDate           DateTime @default(now())
+  duration              Int      // in minutes
+  rating                Int      // 1-5 stars
+  notes                 String?
+  horseNotes            String?
+  weatherContext        Json?    // {temperature, wind, precipitation, timeOfDay, seasonalConsiderations}
+  environmentalFactors  Json?    // Array of environmental factors
+  createdAt             DateTime @default(now())
+}
+
+model Skill {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  category    String
+  description String?
+  userSkills  UserSkill[]
+}
+
+model UserSkill {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillId   String
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, skillId])
+  @@index([userId])
+}
+
+model HorsemanshipMethod {
+  id                String              @id @default(cuid())
+  name              String              @unique
+  category          String
+  founder           String?
+  description       String?
+  keyPrinciples     Json?               // Array of principles
+  commonTerminology Json?               // Object with term definitions
+  typicalEquipment  Json?               // Array of equipment
+  philosophy        String?
+  bestFor           String?
+  createdAt         DateTime            @default(now())
+  conversations     Conversation[]
+  savedAnswers      SavedAnswer[]
+  userPreferences   UserMethodPreference[]
+}
+
+model UserMethodPreference {
+  id              String            @id @default(cuid())
+  userId          String            @unique
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryMethodId String?
+  primaryMethod   HorsemanshipMethod? @relation(fields: [primaryMethodId], references: [id])
+  showComparisons Boolean           @default(false)
+  methodRatings   Json?             // Array of {methodId, comfortLevel 1-5, yearsExperience}
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Conversation {
+  id               String        @id @default(cuid())
+  visibleId        String        @unique
+  visibleIdDisplay String
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  methodId         String?
+  method           HorsemanshipMethod? @relation(fields: [methodId], references: [id])
+  title            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  messages         Message[]
+  mediaUploads     MediaUpload[]
+}
+
+model Message {
+  id            String       @id @default(cuid())
+  conversationId String
+  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role          String       // 'user' or 'assistant'
+  content       String
+  mediaUrls     Json?        // Array of media URLs
+  mediaAnalysis Json?        // AI analysis of media
+  createdAt     DateTime     @default(now())
+  mediaUploads  MediaUpload[]
+}
+
+model MediaUpload {
+  id               String       @id @default(cuid())
+  visibleId        String       @unique
+  visibleIdDisplay String
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId   String?
+  conversation     Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId        String?
+  message          Message?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mediaType        String       // 'photo' or 'video'
+  storageUrl       String
+  thumbnailUrl     String?
+  duration         Int?         // in seconds for videos
+  fileSize         Int?         // in bytes
+  createdAt        DateTime     @default(now())
+}
+
+model SavedAnswer {
+  id               String            @id @default(cuid())
+  visibleId        String            @unique
+  visibleIdDisplay String
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question         String
+  answer           String
+  methodId         String?
+  method           HorsemanshipMethod? @relation(fields: [methodId], references: [id])
+  mediaUrls        Json?             // Array of media URLs
+  category         String?
+  createdAt        DateTime          @default(now())
+}
+
+model Horse {
+  id                String        @id @default(cuid())
+  visibleId         String        @unique
+  visibleIdDisplay  String
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  breed             String?
+  age               String?       // foal, yearling, 2-3yo, 4-10yo, 11-17yo, 18+ senior
+  sex               String?       // mare, gelding, stallion
+  height            String?       // e.g., "15.2 hands"
+  weight            Int?          // in pounds
+  temperament       Json?         // Array of tags: hot/sensitive, steady/calm, lazy/dull, etc.
+  energyLevel       String?       // high, medium, low
+  learningStyle     Json?         // Array of: quick learner, needs repetition, easily frustrated, etc.
+  primaryUse        Json?         // Array of: trail, arena, driving, ranch work, therapy, companion
+  trainingHistory   Json?         // Array of {method, worked, notWorked}
+  knownCues         Json?         // Array of {cue, method}
+  injuries          Json?         // Array of {type, location, date, status, limitations}
+  healthConditions  Json?         // Array of conditions: arthritis, navicular, COPD, etc.
+  pastTrauma        Json?         // Array of known traumatic experiences
+  goodWith          Json?         // Array of things horse handles well
+  struggles         Json?         // Array of things horse finds difficult
+  notes             String?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  sessions          Session[]
+  lessons           Lesson[]
+}
+
+model Facility {
+  id                    String        @id @default(cuid())
+  visibleId             String        @unique
+  visibleIdDisplay      String
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                  String
+  arenaType             String?       // indoor, outdoor, covered, round pen, none
+  arenaSize             String?       // small <100ft, medium, large, full dressage court
+  footing               String?       // sand, grass, dirt, gravel, rubber, mixed
+  roundPen              Boolean       @default(false)
+  roundPenSize          String?       // if roundPen is true
+  trailAccess           String?       // none, limited, extensive
+  obstacles             Json?         // Array of available obstacles: poles, cones, bridge, tarp, etc.
+  tieSafe               String?       // hitching post, cross ties, none
+  washRack              Boolean       @default(false)
+  pasture               Boolean       @default(false)
+  pastureSize           String?
+  otherHorses           Boolean       @default(false) // can work around other horses
+  lighting              String?       // natural only, has arena lights
+  weatherConsiderations String?       // primarily indoor, exposed to elements, seasonal limitations
+  notes                 String?
+  isActive              Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  sessions              Session[]
+}
