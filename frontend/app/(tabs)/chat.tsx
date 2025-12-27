@@ -11,12 +11,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { API_URL } from '../constants';
-import SuggestedQuestions from '../../components/SuggestedQuestions';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { Card, Button } from '../../components/ui';
 
 interface TimestampReference {
   timestamp: string;
@@ -84,6 +86,8 @@ export default function ChatScreen() {
       // Load first conversation if exists
       if (data.length > 0 && !currentConversation) {
         loadConversation(data[0].id);
+      } else if (data.length === 0) {
+        setCurrentConversation(null);
       }
     } catch (error) {
       console.error('Load conversations error:', error);
@@ -112,77 +116,6 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('Load conversation error:', error);
       Alert.alert('Error', 'Failed to load conversation');
-    }
-  };
-
-  const loadSuggestedQuestions = async () => {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch(`${API_URL}/api/training/suggested-questions`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestedQuestions(data.questions || []);
-      }
-    } catch (error) {
-      console.error('Load suggested questions error:', error);
-    }
-  };
-
-  const handleSuggestedQuestionPress = (question: string) => {
-    setMessage(question);
-  };
-
-  const loadMethodPreference = async () => {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch(`${API_URL}/api/methods/preference/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUserMethodPreference(data);
-        setShowComparisons(data?.showComparisons || false);
-      }
-    } catch (error) {
-      console.error('Load method preference error:', error);
-    }
-  };
-
-  const toggleComparisons = async () => {
-    const newValue = !showComparisons;
-    setShowComparisons(newValue);
-
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token || !userMethodPreference) return;
-
-      await fetch(`${API_URL}/api/methods/preference`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          primaryMethodId: userMethodPreference.primaryMethodId,
-          showComparisons: newValue,
-        }),
-      });
-    } catch (error) {
-      console.error('Update comparison toggle error:', error);
-      // Revert on error
-      setShowComparisons(!newValue);
     }
   };
 
@@ -252,66 +185,217 @@ export default function ChatScreen() {
     }
   };
 
+  const saveAnswer = async (question: string, answer: string) => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/saved-answers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          question,
+          answer,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save answer');
+      }
+
+      Alert.alert('Success', 'Answer saved to your library!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save answer');
+    }
+  };
+
+  const showMediaOptions = async () => {
+    Alert.alert(
+      'Add Media',
+      'Choose an option',
+      [
+        { text: 'Camera', onPress: pickImageFromCamera },
+        { text: 'Photo Library', onPress: pickImageFromLibrary },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const pickImageFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera permission is required');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMedia({
+        url: result.assets[0].uri,
+        thumbnail: result.assets[0].uri,
+        type: result.assets[0].type === 'video' ? 'video' : 'photo',
+      });
+    }
+  };
+
+  const pickImageFromLibrary = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Photo library permission is required');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMedia({
+        url: result.assets[0].uri,
+        thumbnail: result.assets[0].uri,
+        type: result.assets[0].type === 'video' ? 'video' : 'photo',
+      });
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
-    const hasVideoTimestamps = item.role === 'assistant' && 
+    const isUser = item.role === 'user';
+    const hasVideoTimestamps = !isUser && 
       item.mediaAnalysis?.hasVideoTimestamps && 
       item.mediaAnalysis?.timestampReferences &&
       item.mediaAnalysis.timestampReferences.length > 0;
 
+    // Find the user message that preceded this assistant message for saving
+    const messages = currentConversation?.messages || [];
+    const messageIndex = messages.findIndex(m => m.id === item.id);
+    const precedingUserMessage = messageIndex > 0 && messages[messageIndex - 1]?.role === 'user'
+      ? messages[messageIndex - 1].content
+      : '';
+
     return (
       <View
         style={[
-          styles.messageContainer,
-          item.role === 'user' ? styles.userMessage : styles.assistantMessage,
+          styles.messageWrapper,
+          isUser && styles.userMessageWrapper,
         ]}
       >
-        <Text
+        <View
           style={[
-            styles.messageText,
-            item.role === 'user' && styles.userMessageText,
+            styles.messageBubble,
+            isUser ? styles.userMessageBubble : styles.assistantMessageBubble,
           ]}
         >
-          {item.content}
-        </Text>
-        {hasVideoTimestamps && (
-          <View style={styles.timestampsContainer}>
-            <Text style={styles.timestampsTitle}>Key Moments:</Text>
-            {item.mediaAnalysis!.timestampReferences!.slice(0, 5).map((ref, idx) => (
-              <View key={idx} style={styles.timestampBadge}>
-                <Text style={styles.timestampText}>{ref.timestamp}</Text>
-              </View>
-            ))}
-            {item.mediaAnalysis!.timestampReferences!.length > 5 && (
-              <Text style={styles.moreTimestamps}>
-                +{item.mediaAnalysis!.timestampReferences!.length - 5} more
-              </Text>
-            )}
-          </View>
-        )}
+          <Text
+            style={[
+              styles.messageText,
+              isUser ? styles.userMessageText : styles.assistantMessageText,
+            ]}
+          >
+            {item.content}
+          </Text>
+          {hasVideoTimestamps && (
+            <View style={styles.timestampsContainer}>
+              <Text style={styles.timestampsTitle}>Key Moments:</Text>
+              {item.mediaAnalysis!.timestampReferences!.slice(0, 5).map((ref, idx) => (
+                <View key={idx} style={styles.timestampBadge}>
+                  <Text style={styles.timestampText}>{ref.timestamp}</Text>
+                </View>
+              ))}
+              {item.mediaAnalysis!.timestampReferences!.length > 5 && (
+                <Text style={styles.moreTimestamps}>
+                  +{item.mediaAnalysis!.timestampReferences!.length - 5} more
+                </Text>
+              )}
+            </View>
+          )}
+          {!isUser && (
+            <Pressable
+              style={styles.saveButton}
+              onPress={() => saveAnswer(precedingUserMessage, item.content)}
+            >
+              <Text style={styles.saveButtonText}>💾 Save Answer</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     );
   };
 
+  const SuggestionChip = ({ text, onPress }: { text: string; onPress: () => void }) => (
+    <Pressable style={styles.suggestionChip} onPress={onPress}>
+      <Text style={styles.suggestionChipText}>{text}</Text>
+    </Pressable>
+  );
+
   if (loadingConversations) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#8B7355" />
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
 
-  if (!currentConversation) {
+  const messages = currentConversation?.messages || [];
+
+  if (!currentConversation || messages.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Ask the Trainer</Text>
-          <Text style={styles.emptyText}>
-            Get personalized advice from an AI trainer who knows your experience level and training plan.
-          </Text>
-          <TouchableOpacity style={styles.startButton} onPress={createNewConversation}>
-            <Text style={styles.startButtonText}>Start New Conversation</Text>
-          </TouchableOpacity>
-        </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.welcomeContainer}
+        >
+          <View style={styles.welcomeChat}>
+            <Text style={styles.welcomeTitle}>Ask the Trainer</Text>
+            <Text style={styles.welcomeText}>
+              Get answers to any horse training question. I know your experience level
+              and training goals, so I'll tailor my advice to you.
+            </Text>
+            
+            <Text style={styles.suggestionsTitle}>Try asking:</Text>
+            <View style={styles.suggestions}>
+              <SuggestionChip
+                text="How do I know if my horse is relaxed?"
+                onPress={() => {
+                  createNewConversation().then(() => {
+                    setMessage("How do I know if my horse is relaxed?");
+                  });
+                }}
+              />
+              <SuggestionChip
+                text="What should I do if my horse won't stand still?"
+                onPress={() => {
+                  createNewConversation().then(() => {
+                    setMessage("What should I do if my horse won't stand still?");
+                  });
+                }}
+              />
+              <SuggestionChip
+                text="How tight should my girth be?"
+                onPress={() => {
+                  createNewConversation().then(() => {
+                    setMessage("How tight should my girth be?");
+                  });
+                }}
+              />
+            </View>
+            <Button
+              title="Start New Conversation"
+              onPress={createNewConversation}
+              style={styles.startButton}
+              fullWidth
+            />
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -323,11 +407,19 @@ export default function ChatScreen() {
       keyboardVerticalOffset={90}
     >
       <FlatList
-        data={currentConversation.messages || []}
+        data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
         inverted={false}
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.typingIndicator}>
+              <Text style={styles.typingText}>Trainer is typing...</Text>
+              <ActivityIndicator size="small" color={colors.neutral[500]} />
+            </View>
+          ) : null
+        }
       />
 
       {selectedMedia && (
@@ -353,7 +445,7 @@ export default function ChatScreen() {
           disabled={loading || uploadingMedia}
         >
           {uploadingMedia ? (
-            <ActivityIndicator color="#8B7355" size="small" />
+            <ActivityIndicator color={colors.primary[500]} size="small" />
           ) : (
             <Text style={styles.mediaButtonText}>📷</Text>
           )}
@@ -361,7 +453,7 @@ export default function ChatScreen() {
         <TextInput
           style={styles.input}
           placeholder="Ask a question..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.neutral[400]}
           value={message}
           onChangeText={setMessage}
           multiline
@@ -376,7 +468,7 @@ export default function ChatScreen() {
           disabled={(!message.trim() && !selectedMedia) || loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={colors.surface} size="small" />
           ) : (
             <Text style={styles.sendButtonText}>Send</Text>
           )}
@@ -389,134 +481,177 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F1EA',
+    backgroundColor: colors.neutral[50],
   },
-  emptyState: {
+  scrollView: {
     flex: 1,
+  },
+  welcomeContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  welcomeChat: {
     alignItems: 'center',
-    padding: 24,
   },
-  emptyTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#8B7355',
-    marginBottom: 16,
+  welcomeTitle: {
+    ...typography.h1,
+    color: colors.neutral[900],
+    marginBottom: spacing.md,
     textAlign: 'center',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#5A4A3A',
+  welcomeText: {
+    ...typography.body,
+    color: colors.neutral[600],
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
+    marginBottom: spacing.xl,
+    lineHeight: typography.body.lineHeight,
+  },
+  suggestionsTitle: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.neutral[700],
+    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  suggestions: {
+    width: '100%',
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  suggestionChip: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    ...shadows.sm,
+  },
+  suggestionChipText: {
+    ...typography.body,
+    color: colors.neutral[700],
   },
   startButton: {
-    backgroundColor: '#8B7355',
-    borderRadius: 12,
-    padding: 16,
-    paddingHorizontal: 32,
-  },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    marginTop: spacing.md,
   },
   messagesList: {
-    padding: 16,
+    padding: spacing.lg,
     paddingBottom: 80,
   },
-  messageContainer: {
+  messageWrapper: {
+    width: '100%',
+    marginBottom: spacing.md,
+    alignItems: 'flex-start',
+  },
+  userMessageWrapper: {
+    alignItems: 'flex-end',
+  },
+  messageBubble: {
     maxWidth: '80%',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
   },
-  userMessage: {
-    backgroundColor: '#8B7355',
-    alignSelf: 'flex-end',
+  userMessageBubble: {
+    backgroundColor: colors.primary[500],
   },
-  assistantMessage: {
-    backgroundColor: '#fff',
-    alignSelf: 'flex-start',
+  assistantMessageBubble: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#D4C4B0',
+    borderColor: colors.neutral[200],
   },
   messageText: {
-    fontSize: 16,
-    color: '#5A4A3A',
-    lineHeight: 22,
+    ...typography.body,
+    lineHeight: typography.body.lineHeight,
   },
   userMessageText: {
-    color: '#fff',
+    color: colors.surface,
+  },
+  assistantMessageText: {
+    color: colors.neutral[900],
   },
   timestampsContainer: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    borderTopColor: colors.neutral[200],
   },
   timestampsTitle: {
-    fontSize: 14,
+    ...typography.bodySmall,
     fontWeight: '600',
-    color: '#8B7355',
-    marginBottom: 8,
+    color: colors.primary[500],
+    marginBottom: spacing.sm,
   },
   timestampBadge: {
-    backgroundColor: '#F5F1EA',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 6,
+    backgroundColor: colors.neutral[50],
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginRight: spacing.xs,
+    marginBottom: spacing.xs,
     alignSelf: 'flex-start',
   },
   timestampText: {
-    fontSize: 12,
-    color: '#8B7355',
+    ...typography.caption,
+    color: colors.primary[500],
     fontWeight: '600',
   },
   moreTimestamps: {
-    fontSize: 12,
-    color: '#999',
+    ...typography.caption,
+    color: colors.neutral[400],
     fontStyle: 'italic',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
-  messageMediaContainer: {
-    marginBottom: 8,
-    borderRadius: 8,
-    overflow: 'hidden',
+  saveButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
   },
-  messageMedia: {
-    width: 200,
-    height: 150,
-    borderRadius: 8,
-    backgroundColor: '#000',
+  saveButtonText: {
+    ...typography.caption,
+    color: colors.primary[700],
+    fontWeight: '600',
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  typingText: {
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    fontStyle: 'italic',
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#D4C4B0',
+    borderTopColor: colors.neutral[200],
     alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: '#F5F1EA',
-    borderRadius: 20,
-    padding: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    backgroundColor: colors.neutral[50],
+    borderRadius: borderRadius.full,
+    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    ...typography.body,
     maxHeight: 100,
-    marginRight: 8,
-    color: '#333',
+    marginRight: spacing.sm,
+    color: colors.neutral[900],
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
   },
   sendButton: {
-    backgroundColor: '#8B7355',
-    borderRadius: 20,
-    padding: 12,
-    paddingHorizontal: 24,
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.full,
+    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -524,97 +659,45 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   sendButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    ...typography.body,
+    color: colors.surface,
     fontWeight: '600',
   },
   mediaPreview: {
-    marginHorizontal: 16,
-    marginBottom: 8,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
     position: 'relative',
     alignSelf: 'flex-start',
   },
   mediaPreviewImage: {
     width: 150,
     height: 150,
-    borderRadius: 8,
-    backgroundColor: '#000',
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.neutral[200],
   },
   removeMediaButton: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#DC3545',
-    borderRadius: 12,
+    backgroundColor: colors.error,
+    borderRadius: borderRadius.full,
     width: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   removeMediaText: {
-    color: '#fff',
+    color: colors.surface,
     fontSize: 18,
     fontWeight: 'bold',
   },
   mediaButton: {
-    padding: 12,
-    marginRight: 8,
+    padding: spacing.md,
+    marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mediaButtonText: {
     fontSize: 24,
-  },
-  comparisonToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
-  },
-  comparisonLabel: {
-    fontSize: 16,
-    color: '#5A4A3A',
-    flex: 1,
-  },
-  comparisonToggleBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#D4C4B0',
-  },
-  comparisonToggleLabel: {
-    fontSize: 14,
-    color: '#5A4A3A',
-    fontWeight: '500',
-  },
-  toggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#D4C4B0',
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleActive: {
-    backgroundColor: '#8B7355',
-  },
-  toggleCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#fff',
-    alignSelf: 'flex-start',
-  },
-  toggleCircleActive: {
-    alignSelf: 'flex-end',
   },
 });

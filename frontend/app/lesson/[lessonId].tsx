@@ -8,27 +8,54 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Pressable,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import Card from '../../components/ui/Card';
+import { Button } from '../../components/ui';
+
+interface Lesson {
+  id: string;
+  lessonId: string;
+  title: string;
+  phaseNumber: number;
+  moduleNumber: number;
+  lessonNumber: number;
+  isCompleted: boolean;
+  content?: any;
+  plan?: {
+    id: string;
+    lessons?: Array<{
+      id: string;
+      lessonId: string;
+      title: string;
+      phaseNumber: number;
+      moduleNumber: number;
+      lessonNumber: number;
+      isCompleted: boolean;
+    }>;
+  };
+}
 
 export default function LessonScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
-  const [lesson, setLesson] = useState<any>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [nextLesson, setNextLesson] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [sessionData, setSessionData] = useState({
-    duration: '',
-    rating: 5,
-    notes: '',
-    horseNotes: '',
-  });
-  const [loggingSession, setLoggingSession] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
+  const [expandedTips, setExpandedTips] = useState<Set<number>>(new Set());
   const router = useRouter();
 
   useEffect(() => {
     if (lessonId) {
       loadLesson();
+      loadInstructionProgress();
     }
   }, [lessonId]);
 
@@ -55,12 +82,86 @@ export default function LessonScreen() {
 
       const data = await response.json();
       setLesson(data);
+      setIsCompleted(data.isCompleted || false);
+
+      // Load plan to get next lesson
+      const planResponse = await fetch(`${API_URL}/api/training/plan`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (planResponse.ok) {
+        const plan = await planResponse.json();
+        if (plan.lessons) {
+          // Find current lesson index
+          const sortedLessons = [...plan.lessons].sort((a, b) => {
+            if (a.phaseNumber !== b.phaseNumber) return a.phaseNumber - b.phaseNumber;
+            if (a.moduleNumber !== b.moduleNumber) return a.moduleNumber - b.moduleNumber;
+            return a.lessonNumber - b.lessonNumber;
+          });
+
+          const currentIndex = sortedLessons.findIndex(
+            (l) => l.lessonId === lessonId
+          );
+
+          if (currentIndex >= 0 && currentIndex < sortedLessons.length - 1) {
+            setNextLesson(sortedLessons[currentIndex + 1]);
+          }
+        }
+      }
     } catch (error) {
       console.error('Load lesson error:', error);
       Alert.alert('Error', 'Failed to load lesson');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadInstructionProgress = async () => {
+    try {
+      const key = `lesson_progress_${lessonId}`;
+      const saved = await AsyncStorage.getItem(key);
+      if (saved) {
+        const progress = JSON.parse(saved);
+        setCheckedSteps(new Set(progress.checkedSteps || []));
+      }
+    } catch (error) {
+      console.error('Load progress error:', error);
+    }
+  };
+
+  const saveInstructionProgress = async (steps: Set<number>) => {
+    try {
+      const key = `lesson_progress_${lessonId}`;
+      await AsyncStorage.setItem(
+        key,
+        JSON.stringify({ checkedSteps: Array.from(steps) })
+      );
+    } catch (error) {
+      console.error('Save progress error:', error);
+    }
+  };
+
+  const toggleStep = (index: number) => {
+    const newChecked = new Set(checkedSteps);
+    if (newChecked.has(index)) {
+      newChecked.delete(index);
+    } else {
+      newChecked.add(index);
+    }
+    setCheckedSteps(newChecked);
+    saveInstructionProgress(newChecked);
+  };
+
+  const toggleTip = (index: number) => {
+    const newExpanded = new Set(expandedTips);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedTips(newExpanded);
   };
 
   const handleMarkComplete = async () => {
@@ -84,76 +185,31 @@ export default function LessonScreen() {
         throw new Error('Failed to mark lesson complete');
       }
 
-      const data = await response.json();
-      
-      // Show celebration if skills were unlocked
-      if (data.newlyUnlockedSkills && data.newlyUnlockedSkills.length > 0) {
-        Alert.alert(
-          '🎉 Lesson Complete!',
-          `New skills unlocked:\n${data.newlyUnlockedSkills.join('\n')}`,
-          [{ text: 'Awesome!', style: 'default' }]
-        );
-      } else {
-        Alert.alert('Success', 'Lesson marked as complete!');
-      }
-      
-      loadLesson(); // Reload to show updated state
+      setIsCompleted(true);
+      setShowSuccess(true);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
   };
 
-  const handleLogSession = async () => {
-    if (!sessionData.duration) {
-      Alert.alert('Error', 'Please enter session duration');
-      return;
+  const goToNextLesson = () => {
+    setShowSuccess(false);
+    if (nextLesson) {
+      router.replace(`/lesson/${nextLesson.lessonId}`);
+    } else {
+      router.push('/(tabs)/plan');
     }
+  };
 
-    setLoggingSession(true);
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/api/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          lessonId: lessonId,
-          duration: parseInt(sessionData.duration),
-          rating: sessionData.rating,
-          notes: sessionData.notes || undefined,
-          horseNotes: sessionData.horseNotes || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to log session');
-      }
-
-      Alert.alert('Success', 'Session logged successfully!');
-      setSessionData({
-        duration: '',
-        rating: 5,
-        notes: '',
-        horseNotes: '',
-      });
-      loadLesson(); // Reload to show updated sessions
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setLoggingSession(false);
-    }
+  const goToPlan = () => {
+    setShowSuccess(false);
+    router.push('/(tabs)/plan');
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#8B7355" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -167,414 +223,413 @@ export default function LessonScreen() {
   }
 
   const content = lesson.content as any;
+  const duration = content?.duration || 30;
+  const objectives = content?.objective
+    ? [content.objective]
+    : content?.objectives || [];
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>{lesson.title}</Text>
-        <Text style={styles.subtitle}>
-          Phase {lesson.phaseNumber} • Module {lesson.moduleNumber} • Lesson{' '}
-          {lesson.lessonNumber}
-        </Text>
-
-        {content.requiresProfessionalHelp && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              ⚠️ This lesson requires professional instruction. Please work with
-              a qualified instructor.
+    <>
+      <ScrollView style={styles.container}>
+        <View style={styles.content}>
+          {/* Header with Breadcrumb */}
+          <View style={styles.header}>
+            <Text style={styles.breadcrumb}>
+              Phase {lesson.phaseNumber} {'>'} Module {lesson.moduleNumber} {'>'} Lesson{' '}
+              {lesson.lessonNumber}
             </Text>
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Objective</Text>
-          <Text style={styles.sectionText}>{content.objective}</Text>
-        </View>
-
-        {content.equipment && content.equipment.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Equipment Needed</Text>
-            {content.equipment.map((item: string, index: number) => (
-              <Text key={index} style={styles.bulletPoint}>
-                • {item}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        {content.instructions && content.instructions.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Instructions</Text>
-            {content.instructions.map((instruction: string, index: number) => (
-              <View key={index} style={styles.instructionStep}>
-                <Text style={styles.stepNumber}>{index + 1}</Text>
-                <Text style={styles.instructionText}>{instruction}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {content.safetyNotes && content.safetyNotes.length > 0 && (
-          <View style={[styles.section, styles.safetySection]}>
-            <Text style={styles.sectionTitle}>⚠️ Safety Notes</Text>
-            {content.safetyNotes.map((note: string, index: number) => (
-              <Text key={index} style={styles.safetyPoint}>
-                • {note}
-              </Text>
-            ))}
-            <View style={styles.safetyReminder}>
-              <Text style={styles.safetyReminderText}>
-                Always prioritize safety. If unsure, seek guidance from a qualified instructor.
-              </Text>
+            <Text style={styles.title}>{lesson.title}</Text>
+            <View style={styles.timeRow}>
+              <Text style={styles.timeIcon}>⏱</Text>
+              <Text style={styles.timeText}>~{duration} minutes</Text>
             </View>
           </View>
-        )}
 
-        {content.commonMistakes && content.commonMistakes.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Common Mistakes</Text>
-            {content.commonMistakes.map((mistake: string, index: number) => (
-              <Text key={index} style={styles.bulletPoint}>
-                • {mistake}
+          {content?.requiresProfessionalHelp && (
+            <Card style={styles.warningCard}>
+              <Text style={styles.warningText}>
+                ⚠️ This lesson requires professional instruction. Please work with a
+                qualified instructor.
               </Text>
-            ))}
-          </View>
-        )}
+            </Card>
+          )}
 
-        {content.moveOnWhen && content.moveOnWhen.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Move On When</Text>
-            {content.moveOnWhen.map((criterion: string, index: number) => (
-              <Text key={index} style={styles.bulletPoint}>
-                ✓ {criterion}
+          {/* Learning Objectives */}
+          {objectives.length > 0 && (
+            <Card style={styles.objectivesCard}>
+              <Text style={styles.sectionTitle}>🎯 Learning Objectives</Text>
+              <Text style={styles.objectiveText}>
+                By the end of this lesson, you'll be able to:
               </Text>
-            ))}
-          </View>
-        )}
-
-        {!lesson.isCompleted && (
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={handleMarkComplete}
-          >
-            <Text style={styles.completeButtonText}>
-              Mark as Complete
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {lesson.isCompleted && (
-          <View style={styles.completedBadge}>
-            <Text style={styles.completedText}>✓ Lesson Completed</Text>
-          </View>
-        )}
-
-        <View style={styles.sessionSection}>
-          <Text style={styles.sectionTitle}>Log Session</Text>
-
-          <Text style={styles.label}>Duration (minutes)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter duration"
-            keyboardType="number-pad"
-            value={sessionData.duration}
-            onChangeText={(text) =>
-              setSessionData({ ...sessionData, duration: text })
-            }
-          />
-
-          <Text style={styles.label}>Rating (1-5)</Text>
-          <View style={styles.ratingRow}>
-            {[1, 2, 3, 4, 5].map((rating) => (
-              <TouchableOpacity
-                key={rating}
-                style={[
-                  styles.ratingButton,
-                  sessionData.rating === rating && styles.ratingButtonSelected,
-                ]}
-                onPress={() => setSessionData({ ...sessionData, rating })}
-              >
-                <Text
-                  style={[
-                    styles.ratingText,
-                    sessionData.rating === rating &&
-                      styles.ratingTextSelected,
-                  ]}
-                >
-                  {rating}
+              {objectives.map((obj: string, index: number) => (
+                <Text key={index} style={styles.bulletPoint}>
+                  • {obj}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+              ))}
+            </Card>
+          )}
 
-          <Text style={styles.label}>Notes</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="How did the session go?"
-            multiline
-            numberOfLines={3}
-            value={sessionData.notes}
-            onChangeText={(text) =>
-              setSessionData({ ...sessionData, notes: text })
-            }
-          />
+          {/* Equipment */}
+          {content?.equipment && content.equipment.length > 0 && (
+            <Card style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>🛠 Equipment Needed</Text>
+              {content.equipment.map((item: string, index: number) => (
+                <Text key={index} style={styles.bulletPoint}>
+                  • {item}
+                </Text>
+              ))}
+            </Card>
+          )}
 
-          <Text style={styles.label}>Horse Notes</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="How was the horse's behavior/mood?"
-            multiline
-            numberOfLines={3}
-            value={sessionData.horseNotes}
-            onChangeText={(text) =>
-              setSessionData({ ...sessionData, horseNotes: text })
-            }
-          />
+          {/* Interactive Instructions */}
+          {content?.instructions && content.instructions.length > 0 && (
+            <Card style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>📋 Step-by-Step Instructions</Text>
+              {content.instructions.map((instruction: string, index: number) => {
+                const isChecked = checkedSteps.has(index);
+                return (
+                  <Pressable
+                    key={index}
+                    style={[
+                      styles.instructionStep,
+                      isChecked && styles.instructionStepChecked,
+                    ]}
+                    onPress={() => toggleStep(index)}
+                  >
+                    <View style={styles.checkbox}>
+                      {isChecked && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <View style={styles.instructionContent}>
+                      <Text
+                        style={[
+                          styles.instructionText,
+                          isChecked && styles.instructionTextChecked,
+                        ]}
+                      >
+                        {instruction}
+                      </Text>
+                      {/* Tip expansion could go here if we add tips to instructions */}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Card>
+          )}
 
-          <TouchableOpacity
-            style={[styles.logButton, loggingSession && styles.buttonDisabled]}
-            onPress={handleLogSession}
-            disabled={loggingSession}
-          >
-            <Text style={styles.logButtonText}>
-              {loggingSession ? 'Logging...' : 'Log Session'}
-            </Text>
-          </TouchableOpacity>
+          {/* Safety Notes */}
+          {content?.safetyNotes && content.safetyNotes.length > 0 && (
+            <Card style={styles.safetyCard}>
+              <Text style={styles.sectionTitle}>⚠️ Safety Notes</Text>
+              {content.safetyNotes.map((note: string, index: number) => (
+                <Text key={index} style={styles.safetyPoint}>
+                  • {note}
+                </Text>
+              ))}
+            </Card>
+          )}
+
+          {/* Common Mistakes */}
+          {content?.commonMistakes && content.commonMistakes.length > 0 && (
+            <Card style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>💡 Common Mistakes to Avoid</Text>
+              {content.commonMistakes.map((mistake: string, index: number) => (
+                <Text key={index} style={styles.bulletPoint}>
+                  • {mistake}
+                </Text>
+              ))}
+            </Card>
+          )}
+
+          {/* Move On When */}
+          {content?.moveOnWhen && content.moveOnWhen.length > 0 && (
+            <Card style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>✅ Move On When</Text>
+              {content.moveOnWhen.map((criterion: string, index: number) => (
+                <Text key={index} style={styles.bulletPoint}>
+                  ✓ {criterion}
+                </Text>
+              ))}
+            </Card>
+          )}
+
+          {/* Complete Button */}
+          {!isCompleted && (
+            <Button
+              title="Mark as Complete"
+              onPress={handleMarkComplete}
+              style={styles.completeButton}
+              fullWidth
+            />
+          )}
+
+          {isCompleted && (
+            <Card style={styles.completedCard}>
+              <Text style={styles.completedText}>✓ Lesson Completed</Text>
+            </Card>
+          )}
+
+          {/* What's Next */}
+          {nextLesson && (
+            <Card style={styles.nextUpCard}>
+              <Text style={styles.nextUpLabel}>Up Next</Text>
+              <Text style={styles.nextUpTitle}>{nextLesson.title}</Text>
+              <Button
+                title="Start Next Lesson →"
+                onPress={() => router.push(`/lesson/${nextLesson.lessonId}`)}
+                variant="outline"
+                style={styles.nextButton}
+                fullWidth
+              />
+            </Card>
+          )}
         </View>
+      </ScrollView>
 
-        {lesson.sessions && lesson.sessions.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Previous Sessions</Text>
-            {lesson.sessions.map((session: any) => (
-              <View key={session.id} style={styles.sessionCard}>
-                <Text style={styles.sessionDate}>
-                  {new Date(session.sessionDate).toLocaleDateString()}
-                </Text>
-                <Text>Duration: {session.duration} minutes</Text>
-                <Text>Rating: {'⭐'.repeat(session.rating)}</Text>
-                {session.notes && (
-                  <Text style={styles.sessionNotes}>{session.notes}</Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    </ScrollView>
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccess}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccess(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Card style={styles.successModal}>
+            <Text style={styles.successEmoji}>🎉</Text>
+            <Text style={styles.successTitle}>Lesson Complete!</Text>
+            <Text style={styles.successText}>
+              Great job! You're making progress.
+            </Text>
+            <View style={styles.successButtons}>
+              {nextLesson ? (
+                <Button
+                  title="Continue to Next Lesson →"
+                  onPress={goToNextLesson}
+                  style={styles.successButton}
+                  fullWidth
+                />
+              ) : (
+                <Button
+                  title="View Training Plan"
+                  onPress={goToPlan}
+                  style={styles.successButton}
+                  fullWidth
+                />
+              )}
+              <Button
+                title="Back to Plan"
+                onPress={goToPlan}
+                variant="outline"
+                style={styles.successButton}
+                fullWidth
+              />
+            </View>
+          </Card>
+        </View>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F1EA',
+    backgroundColor: colors.neutral[50],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.neutral[50],
   },
   content: {
-    padding: 24,
+    padding: spacing.lg,
+  },
+  header: {
+    marginBottom: spacing.lg,
+  },
+  breadcrumb: {
+    ...typography.caption,
+    color: colors.neutral[500],
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#5A4A3A',
-    marginBottom: 8,
+    ...typography.h1,
+    color: colors.neutral[900],
+    marginBottom: spacing.sm,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#999',
-    marginBottom: 24,
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  warningBox: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#FFC107',
+  timeIcon: {
+    fontSize: typography.body.fontSize,
+    marginRight: spacing.xs,
+  },
+  timeText: {
+    ...typography.bodySmall,
+    color: colors.neutral[600],
+  },
+  warningCard: {
+    backgroundColor: colors.warning + '20',
+    borderColor: colors.warning,
+    borderWidth: 2,
+    marginBottom: spacing.lg,
   },
   warningText: {
-    fontSize: 16,
-    color: '#856404',
+    ...typography.body,
+    color: colors.neutral[800],
   },
-  section: {
-    marginBottom: 32,
+  objectivesCard: {
+    marginBottom: spacing.lg,
+    backgroundColor: colors.primary[50],
+  },
+  sectionCard: {
+    marginBottom: spacing.lg,
+  },
+  safetyCard: {
+    marginBottom: spacing.lg,
+    backgroundColor: colors.warning + '20',
+    borderColor: colors.warning,
+    borderWidth: 2,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#8B7355',
-    marginBottom: 12,
+    ...typography.h3,
+    color: colors.neutral[900],
+    marginBottom: spacing.md,
   },
-  sectionText: {
-    fontSize: 16,
-    color: '#5A4A3A',
-    lineHeight: 24,
+  objectiveText: {
+    ...typography.body,
+    color: colors.neutral[700],
+    marginBottom: spacing.sm,
   },
   bulletPoint: {
-    fontSize: 16,
-    color: '#5A4A3A',
-    lineHeight: 24,
-    marginBottom: 8,
+    ...typography.body,
+    color: colors.neutral[700],
+    lineHeight: typography.body.lineHeight,
+    marginBottom: spacing.sm,
   },
   instructionStep: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.neutral[50],
   },
-  stepNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#8B7355',
-    marginRight: 12,
+  instructionStepChecked: {
+    backgroundColor: colors.success + '20',
+  },
+  checkbox: {
     width: 24,
+    height: 24,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.primary[500],
+    marginRight: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  checkmark: {
+    fontSize: typography.bodySmall.fontSize,
+    color: colors.primary[500],
+    fontWeight: '700',
+  },
+  instructionContent: {
+    flex: 1,
   },
   instructionText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#5A4A3A',
-    lineHeight: 24,
+    ...typography.body,
+    color: colors.neutral[900],
+    lineHeight: typography.body.lineHeight,
   },
-  completeButton: {
-    backgroundColor: '#8B7355',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  completeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  completedBadge: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#8B7355',
-  },
-  completedText: {
-    color: '#8B7355',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  sessionSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#5A4A3A',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    backgroundColor: '#F5F1EA',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#D4C4B0',
-    color: '#333',
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  ratingButton: {
-    flex: 1,
-    backgroundColor: '#F5F1EA',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#D4C4B0',
-  },
-  ratingButtonSelected: {
-    borderColor: '#8B7355',
-    backgroundColor: '#8B7355',
-  },
-  ratingText: {
-    fontSize: 18,
-    color: '#5A4A3A',
-    fontWeight: '600',
-  },
-  ratingTextSelected: {
-    color: '#fff',
-  },
-  logButton: {
-    backgroundColor: '#8B7355',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  logButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  sessionCard: {
-    backgroundColor: '#F5F1EA',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  sessionDate: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8B7355',
-    marginBottom: 4,
-  },
-  sessionNotes: {
-    fontSize: 14,
-    color: '#5A4A3A',
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 48,
-  },
-  safetySection: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#FFC107',
+  instructionTextChecked: {
+    textDecorationLine: 'line-through',
+    color: colors.neutral[500],
   },
   safetyPoint: {
-    fontSize: 16,
-    color: '#856404',
-    lineHeight: 24,
-    marginBottom: 8,
+    ...typography.body,
+    color: colors.neutral[800],
+    lineHeight: typography.body.lineHeight,
+    marginBottom: spacing.sm,
     fontWeight: '500',
   },
-  safetyReminder: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#FFC107',
+  completeButton: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  safetyReminderText: {
-    fontSize: 14,
-    color: '#856404',
-    fontStyle: 'italic',
-    lineHeight: 20,
+  completedCard: {
+    backgroundColor: colors.success + '20',
+    borderColor: colors.success,
+    borderWidth: 2,
+    marginBottom: spacing.lg,
+  },
+  completedText: {
+    ...typography.body,
+    color: colors.success,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  nextUpCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.secondary[50],
+  },
+  nextUpLabel: {
+    ...typography.caption,
+    color: colors.neutral[500],
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  nextUpTitle: {
+    ...typography.h3,
+    color: colors.neutral[900],
+    marginBottom: spacing.md,
+  },
+  nextButton: {
+    marginTop: spacing.xs,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  successModal: {
+    width: '100%',
+    maxWidth: 400,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  successEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  successTitle: {
+    ...typography.h2,
+    color: colors.neutral[900],
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  successText: {
+    ...typography.body,
+    color: colors.neutral[600],
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  successButtons: {
+    width: '100%',
+    gap: spacing.md,
+  },
+  successButton: {
+    marginTop: 0,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.neutral[500],
+    textAlign: 'center',
+    marginTop: spacing.xxl,
   },
 });
