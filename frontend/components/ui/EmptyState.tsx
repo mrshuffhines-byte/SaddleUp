@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h3,
-    fontWeight: typography.weights.bold,
+    fontWeight: '700',
     color: colors.neutral[900],
     textAlign: 'center',
     marginBottom: spacing.sm,
