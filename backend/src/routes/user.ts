@@ -21,7 +21,8 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       where: { id: req.userId },
       include: {
         profile: true,
-        trainingPlan: {
+        trainingPlans: {
+          where: { isActive: true },
           include: {
             lessons: {
               orderBy: [
@@ -29,8 +30,22 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
                 { moduleNumber: 'asc' },
                 { lessonNumber: 'asc' },
               ],
+              take: 10, // Just get a few for overview
+            },
+            planHorses: {
+              include: {
+                horse: {
+                  select: {
+                    id: true,
+                    name: true,
+                    visibleIdDisplay: true,
+                  },
+                },
+              },
             },
           },
+          orderBy: { createdAt: 'desc' },
+          take: 1, // Get most recent active plan for backward compatibility
         },
       },
     });

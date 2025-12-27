@@ -18,22 +18,47 @@ const createSessionSchema = z.object({
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const data = createSessionSchema.parse(req.body);
+    const { planId } = req.body;
 
-    // Verify lesson exists and belongs to user's plan
-    const plan = await prisma.trainingPlan.findUnique({
-      where: { userId: req.userId! },
-    });
+    // Find the lesson (can be from any of user's plans)
+    let lesson;
+    if (planId) {
+      // Verify plan belongs to user
+      const plan = await prisma.trainingPlan.findFirst({
+        where: {
+          id: planId,
+          userId: req.userId!,
+        },
+      });
 
-    if (!plan) {
-      return res.status(404).json({ error: 'No training plan found' });
+      if (!plan) {
+        return res.status(404).json({ error: 'Training plan not found' });
+      }
+
+      lesson = await prisma.lesson.findFirst({
+        where: {
+          planId: plan.id,
+          lessonId: data.lessonId,
+        },
+      });
+    } else {
+      // Find lesson from any of user's plans (backward compatibility)
+      const plans = await prisma.trainingPlan.findMany({
+        where: { userId: req.userId! },
+        select: { id: true },
+      });
+
+      if (plans.length === 0) {
+        return res.status(404).json({ error: 'No training plan found' });
+      }
+
+      lesson = await prisma.lesson.findFirst({
+        where: {
+          planId: { in: plans.map(p => p.id) },
+          lessonId: data.lessonId,
+        },
+      });
     }
-
-    const lesson = await prisma.lesson.findFirst({
-      where: {
-        planId: plan.id,
-        lessonId: data.lessonId,
-      },
-    });
 
     if (!lesson) {
       return res.status(404).json({ error: 'Lesson not found' });

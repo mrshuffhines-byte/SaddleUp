@@ -55,7 +55,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       where: { id: req.userId! },
       include: {
         profile: true,
-        trainingPlan: {
+        trainingPlans: {
+          where: { isActive: true },
           include: {
             lessons: {
               where: { isCompleted: false },
@@ -67,6 +68,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
               take: 10,
             },
           },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
         },
         methodPreference: {
           include: { primaryMethod: true },
@@ -93,7 +96,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       userContext: {
         experienceLevel: user?.profile?.experienceLevel,
         primaryGoal: user?.profile?.primaryGoal,
-        currentLessons: user?.trainingPlan?.lessons || [],
+                currentLessons: user?.trainingPlans?.[0]?.lessons || [],
         methodPreference: user?.methodPreference?.primaryMethod,
         conversationMethod: conversation.method,
         showComparisons: user?.methodPreference?.showComparisons || false,

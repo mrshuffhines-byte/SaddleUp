@@ -20,13 +20,27 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
       return res.status(400).json({ error: 'Please complete onboarding first' });
     }
 
-    // Check if plan already exists
-    const existingPlan = await prisma.trainingPlan.findUnique({
-      where: { userId: req.userId! },
-    });
+    const { name, description, horseIds } = req.body;
 
-    if (existingPlan) {
-      return res.status(400).json({ error: 'Training plan already exists' });
+    // Validate horseIds if provided (max 20 horses)
+    let horses: any[] = [];
+    if (horseIds && Array.isArray(horseIds)) {
+      if (horseIds.length > 20) {
+        return res.status(400).json({ error: 'Maximum 20 horses allowed per plan' });
+      }
+      
+      // Verify all horses belong to the user
+      horses = await prisma.horse.findMany({
+        where: {
+          id: { in: horseIds },
+          userId: req.userId!,
+          isActive: true,
+        },
+      });
+
+      if (horses.length !== horseIds.length) {
+        return res.status(400).json({ error: 'One or more horses not found or do not belong to you' });
+      }
     }
 
     // Generate plan with AI
@@ -62,6 +76,13 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
         generatedContent: planData as any,
         currentPhase: 1,
         currentModule: 1,
+        name: name || undefined,
+        description: description || undefined,
+        planHorses: horses.length > 0 ? {
+          create: horses.map(horse => ({
+            horseId: horse.id,
+          })),
+        } : undefined,
       },
     });
 
@@ -89,7 +110,7 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
       data: lessons,
     });
 
-    // Fetch the complete plan with lessons
+    // Fetch the complete plan with lessons and horses
     const completePlan = await prisma.trainingPlan.findUnique({
       where: { id: trainingPlan.id },
       include: {
@@ -99,6 +120,11 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
             { moduleNumber: 'asc' },
             { lessonNumber: 'asc' },
           ],
+        },
+        planHorses: {
+          include: {
+            horse: true,
+          },
         },
       },
     });
@@ -114,11 +140,63 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
-// Get training plan
-router.get('/plan', authenticate, async (req: AuthRequest, res: Response) => {
+// Get all training plans
+router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const plan = await prisma.trainingPlan.findUnique({
-      where: { userId: req.userId! },
+    const { isActive } = req.query;
+    const where: any = { userId: req.userId! };
+    
+    if (isActive !== undefined) {
+      where.isActive = isActive === 'true';
+    }
+
+    const plans = await prisma.trainingPlan.findMany({
+      where,
+      include: {
+        lessons: {
+          orderBy: [
+            { phaseNumber: 'asc' },
+            { moduleNumber: 'asc' },
+            { lessonNumber: 'asc' },
+          ],
+          take: 1, // Just get count info
+        },
+        planHorses: {
+          include: {
+            horse: {
+              select: {
+                id: true,
+                name: true,
+                visibleIdDisplay: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            lessons: true,
+            planHorses: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(plans);
+  } catch (error) {
+    console.error('Get plans error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get single training plan by ID
+router.get('/plan/:planId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plan = await prisma.trainingPlan.findFirst({
+      where: {
+        id: req.params.planId,
+        userId: req.userId!,
+      },
       include: {
         lessons: {
           orderBy: [
@@ -127,11 +205,52 @@ router.get('/plan', authenticate, async (req: AuthRequest, res: Response) => {
             { lessonNumber: 'asc' },
           ],
         },
+        planHorses: {
+          include: {
+            horse: true,
+          },
+        },
       },
     });
 
     if (!plan) {
-      return res.status(404).json({ error: 'No training plan found' });
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    res.json(plan);
+  } catch (error) {
+    console.error('Get plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get active/default training plan (backward compatibility)
+router.get('/plan', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plan = await prisma.trainingPlan.findFirst({
+      where: {
+        userId: req.userId!,
+        isActive: true,
+      },
+      include: {
+        lessons: {
+          orderBy: [
+            { phaseNumber: 'asc' },
+            { moduleNumber: 'asc' },
+            { lessonNumber: 'asc' },
+          ],
+        },
+        planHorses: {
+          include: {
+            horse: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'No active training plan found' });
     }
 
     res.json(plan);
@@ -144,9 +263,27 @@ router.get('/plan', authenticate, async (req: AuthRequest, res: Response) => {
 // Get single lesson
 router.get('/lesson/:lessonId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const plan = await prisma.trainingPlan.findUnique({
-      where: { userId: req.userId! },
-    });
+    const { planId } = req.query;
+    
+    let plan;
+    if (planId) {
+      // Get lesson from specific plan
+      plan = await prisma.trainingPlan.findFirst({
+        where: {
+          id: planId as string,
+          userId: req.userId!,
+        },
+      });
+    } else {
+      // Get lesson from active plan (backward compatibility)
+      plan = await prisma.trainingPlan.findFirst({
+        where: {
+          userId: req.userId!,
+          isActive: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!plan) {
       return res.status(404).json({ error: 'No training plan found' });
@@ -179,9 +316,27 @@ router.get('/lesson/:lessonId', authenticate, async (req: AuthRequest, res: Resp
 // Mark lesson as complete
 router.patch('/lesson/:lessonId/complete', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const plan = await prisma.trainingPlan.findUnique({
-      where: { userId: req.userId! },
-    });
+    const { planId } = req.body;
+    
+    let plan;
+    if (planId) {
+      // Get lesson from specific plan
+      plan = await prisma.trainingPlan.findFirst({
+        where: {
+          id: planId,
+          userId: req.userId!,
+        },
+      });
+    } else {
+      // Get lesson from active plan (backward compatibility)
+      plan = await prisma.trainingPlan.findFirst({
+        where: {
+          userId: req.userId!,
+          isActive: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!plan) {
       return res.status(404).json({ error: 'No training plan found' });
@@ -240,20 +395,48 @@ router.get('/milestones', authenticate, async (req: AuthRequest, res: Response) 
 // Get suggested questions based on current lesson
 router.get('/suggested-questions', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const plan = await prisma.trainingPlan.findUnique({
-      where: { userId: req.userId! },
-      include: {
-        lessons: {
-          where: { isCompleted: false },
-          orderBy: [
-            { phaseNumber: 'asc' },
-            { moduleNumber: 'asc' },
-            { lessonNumber: 'asc' },
-          ],
-          take: 3,
+    const { planId } = req.query;
+    
+    let plan;
+    if (planId) {
+      plan = await prisma.trainingPlan.findFirst({
+        where: {
+          id: planId as string,
+          userId: req.userId!,
         },
-      },
-    });
+        include: {
+          lessons: {
+            where: { isCompleted: false },
+            orderBy: [
+              { phaseNumber: 'asc' },
+              { moduleNumber: 'asc' },
+              { lessonNumber: 'asc' },
+            ],
+            take: 3,
+          },
+        },
+      });
+    } else {
+      // Get from active plan (backward compatibility)
+      plan = await prisma.trainingPlan.findFirst({
+        where: {
+          userId: req.userId!,
+          isActive: true,
+        },
+        include: {
+          lessons: {
+            where: { isCompleted: false },
+            orderBy: [
+              { phaseNumber: 'asc' },
+              { moduleNumber: 'asc' },
+              { lessonNumber: 'asc' },
+            ],
+            take: 3,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!plan || !plan.lessons || plan.lessons.length === 0) {
       return res.json({ questions: [] });
@@ -290,6 +473,266 @@ router.get('/suggested-questions', authenticate, async (req: AuthRequest, res: R
     res.json({ questions: suggestedQuestions.slice(0, 5) });
   } catch (error) {
     console.error('Get suggested questions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update training plan
+router.patch('/plan/:planId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, isActive, currentPhase, currentModule } = req.body;
+
+    // Verify plan belongs to user
+    const existingPlan = await prisma.trainingPlan.findFirst({
+      where: {
+        id: req.params.planId,
+        userId: req.userId!,
+      },
+    });
+
+    if (!existingPlan) {
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    // Update plan
+    const updatedPlan = await prisma.trainingPlan.update({
+      where: { id: req.params.planId },
+      data: {
+        name: name !== undefined ? name : undefined,
+        description: description !== undefined ? description : undefined,
+        isActive: isActive !== undefined ? isActive : undefined,
+        currentPhase: currentPhase !== undefined ? currentPhase : undefined,
+        currentModule: currentModule !== undefined ? currentModule : undefined,
+      },
+      include: {
+        lessons: {
+          orderBy: [
+            { phaseNumber: 'asc' },
+            { moduleNumber: 'asc' },
+            { lessonNumber: 'asc' },
+          ],
+        },
+        planHorses: {
+          include: {
+            horse: true,
+          },
+        },
+      },
+    });
+
+    res.json(updatedPlan);
+  } catch (error) {
+    console.error('Update plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Assign horses to a plan
+router.post('/plan/:planId/horses', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { horseIds } = req.body;
+
+    if (!Array.isArray(horseIds) || horseIds.length === 0) {
+      return res.status(400).json({ error: 'horseIds must be a non-empty array' });
+    }
+
+    if (horseIds.length > 20) {
+      return res.status(400).json({ error: 'Maximum 20 horses allowed per plan' });
+    }
+
+    // Verify plan belongs to user
+    const plan = await prisma.trainingPlan.findFirst({
+      where: {
+        id: req.params.planId,
+        userId: req.userId!,
+      },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    // Verify all horses belong to the user
+    const horses = await prisma.horse.findMany({
+      where: {
+        id: { in: horseIds },
+        userId: req.userId!,
+        isActive: true,
+      },
+    });
+
+    if (horses.length !== horseIds.length) {
+      return res.status(400).json({ error: 'One or more horses not found or do not belong to you' });
+    }
+
+    // Remove existing assignments for this plan
+    await prisma.planHorse.deleteMany({
+      where: { planId: req.params.planId },
+    });
+
+    // Create new assignments
+    await prisma.planHorse.createMany({
+      data: horseIds.map((horseId: string) => ({
+        planId: req.params.planId,
+        horseId,
+      })),
+    });
+
+    // Fetch updated plan
+    const updatedPlan = await prisma.trainingPlan.findUnique({
+      where: { id: req.params.planId },
+      include: {
+        planHorses: {
+          include: {
+            horse: true,
+          },
+        },
+      },
+    });
+
+    res.json(updatedPlan);
+  } catch (error) {
+    console.error('Assign horses error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add a single horse to a plan
+router.post('/plan/:planId/horses/:horseId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    // Verify plan belongs to user
+    const plan = await prisma.trainingPlan.findFirst({
+      where: {
+        id: req.params.planId,
+        userId: req.userId!,
+      },
+      include: {
+        _count: {
+          select: { planHorses: true },
+        },
+      },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    // Check horse limit
+    if (plan._count.planHorses >= 20) {
+      return res.status(400).json({ error: 'Maximum 20 horses allowed per plan' });
+    }
+
+    // Verify horse belongs to user
+    const horse = await prisma.horse.findFirst({
+      where: {
+        id: req.params.horseId,
+        userId: req.userId!,
+        isActive: true,
+      },
+    });
+
+    if (!horse) {
+      return res.status(404).json({ error: 'Horse not found or does not belong to you' });
+    }
+
+    // Check if already assigned
+    const existing = await prisma.planHorse.findUnique({
+      where: {
+        planId_horseId: {
+          planId: req.params.planId,
+          horseId: req.params.horseId,
+        },
+      },
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'Horse is already assigned to this plan' });
+    }
+
+    // Add horse to plan
+    await prisma.planHorse.create({
+      data: {
+        planId: req.params.planId,
+        horseId: req.params.horseId,
+      },
+    });
+
+    // Fetch updated plan
+    const updatedPlan = await prisma.trainingPlan.findUnique({
+      where: { id: req.params.planId },
+      include: {
+        planHorses: {
+          include: {
+            horse: true,
+          },
+        },
+      },
+    });
+
+    res.json(updatedPlan);
+  } catch (error) {
+    console.error('Add horse to plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Remove a horse from a plan
+router.delete('/plan/:planId/horses/:horseId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    // Verify plan belongs to user
+    const plan = await prisma.trainingPlan.findFirst({
+      where: {
+        id: req.params.planId,
+        userId: req.userId!,
+      },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    // Remove horse from plan
+    const result = await prisma.planHorse.deleteMany({
+      where: {
+        planId: req.params.planId,
+        horseId: req.params.horseId,
+      },
+    });
+
+    if (result.count === 0) {
+      return res.status(404).json({ error: 'Horse is not assigned to this plan' });
+    }
+
+    res.json({ success: true, message: 'Horse removed from plan' });
+  } catch (error) {
+    console.error('Remove horse from plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a training plan
+router.delete('/plan/:planId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    // Verify plan belongs to user
+    const plan = await prisma.trainingPlan.findFirst({
+      where: {
+        id: req.params.planId,
+        userId: req.userId!,
+      },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    // Delete plan (cascades to lessons and planHorses)
+    await prisma.trainingPlan.delete({
+      where: { id: req.params.planId },
+    });
+
+    res.json({ success: true, message: 'Training plan deleted successfully' });
+  } catch (error) {
+    console.error('Delete plan error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
