@@ -1,9 +1,7 @@
-// This file is deprecated - use components/ui/EmptyState.tsx instead
-// Keeping for backward compatibility
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing, typography } from '../app/theme';
-import Button from './ui/Button';
+import { colors, spacing, typography } from '../../app/theme';
+import Button from './Button';
 
 interface EmptyStateProps {
   icon?: string;
@@ -11,6 +9,7 @@ interface EmptyStateProps {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  illustration?: React.ReactNode;
 }
 
 export default function EmptyState({
@@ -19,10 +18,11 @@ export default function EmptyState({
   description,
   actionLabel,
   onAction,
+  illustration,
 }: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>{icon}</Text>
+      {illustration || <Text style={styles.icon}>{icon}</Text>}
       <Text style={styles.title}>{title}</Text>
       {description && <Text style={styles.description}>{description}</Text>}
       {actionLabel && onAction && (

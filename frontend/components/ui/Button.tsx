@@ -1,8 +1,13 @@
-// This file is deprecated - use components/ui/Button.tsx instead
-// Keeping for backward compatibility
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
-import { colors, spacing, typography, borderRadius, shadows } from '../app/theme';
+import { 
+  TouchableOpacity, 
+  Text, 
+  StyleSheet, 
+  ViewStyle, 
+  TextStyle, 
+  ActivityIndicator 
+} from 'react-native';
+import { colors, spacing, borderRadius, shadows, typography } from '../../app/theme';
 
 interface ButtonProps {
   title: string;
@@ -50,7 +55,7 @@ export default function Button({
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? COLORS.surface : COLORS.primary} />
+        <ActivityIndicator color={variant === 'primary' || variant === 'secondary' ? colors.neutral[50] : colors.primary[500]} />
       ) : (
         <>
           {icon && <Text style={styles.icon}>{icon}</Text>}

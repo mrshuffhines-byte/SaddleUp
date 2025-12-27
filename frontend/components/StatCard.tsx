@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../app/constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../app/theme';
 
 interface StatCardProps {
   icon: string;
@@ -21,27 +21,25 @@ export default function StatCard({ icon, value, label }: StatCardProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
+    backgroundColor: colors.neutral[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     alignItems: 'center',
-    ...SHADOWS.sm,
+    ...shadows.sm,
   },
   icon: {
     fontSize: 32,
-    marginBottom: SPACING.xs,
+    marginBottom: spacing.xs,
   },
   value: {
-    fontSize: TYPOGRAPHY.sizes.xl,
-    fontWeight: TYPOGRAPHY.weights.bold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
+    ...typography.h2,
+    color: colors.neutral[900],
+    marginBottom: spacing.xs,
   },
   label: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: COLORS.textTertiary,
+    ...typography.caption,
+    color: colors.neutral[600],
     textAlign: 'center',
-    lineHeight: TYPOGRAPHY.lineHeights.normal * TYPOGRAPHY.sizes.xs,
   },
 });
 

@@ -11,10 +11,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL, COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants';
-import Card from '../../components/Card';
+import { API_URL } from '../constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import Card from '../../components/ui/Card';
 import StatCard from '../../components/StatCard';
-import Button from '../../components/Button';
+import Button from '../../components/ui/Button';
 
 interface User {
   id: string;
