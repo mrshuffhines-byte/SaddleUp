@@ -124,12 +124,14 @@ export async function checkAndUnlockSkills(userId: string): Promise<string[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      trainingPlan: {
+      trainingPlans: {
+        where: { isActive: true },
         include: {
           lessons: {
             where: { isCompleted: true },
           },
         },
+        take: 1,
       },
       userSkills: {
         include: {
