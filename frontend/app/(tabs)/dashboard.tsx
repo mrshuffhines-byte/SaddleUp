@@ -9,6 +9,8 @@ import {
   Alert,
   RefreshControl,
   Pressable,
+  ImageBackground,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -77,6 +79,7 @@ export default function DashboardScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [skillsUnlocked, setSkillsUnlocked] = useState(0);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [planStatus, setPlanStatus] = useState<{ exists: boolean; hasLessons: boolean } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -91,7 +94,7 @@ export default function DashboardScreen() {
         return;
       }
 
-      const [userResponse, sessionsResponse, skillsResponse] = await Promise.all([
+      const [userResponse, sessionsResponse, skillsResponse, planResponse] = await Promise.all([
         fetch(`${API_URL}/api/user/me`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -99,6 +102,9 @@ export default function DashboardScreen() {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`${API_URL}/api/training/skills`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/api/training/plan`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -128,6 +134,17 @@ export default function DashboardScreen() {
       if (skillsResponse.ok) {
         const skillsData = await skillsResponse.json();
         setSkillsUnlocked(skillsData.unlocked?.length || skillsData.total || 0);
+      }
+
+      // Check plan status
+      if (planResponse.ok) {
+        const planData = await planResponse.json();
+        setPlanStatus({
+          exists: true,
+          hasLessons: planData.lessons && planData.lessons.length > 0,
+        });
+      } else {
+        setPlanStatus({ exists: false, hasLessons: false });
       }
     } catch (error) {
       console.error('Load data error:', error);
@@ -237,14 +254,31 @@ export default function DashboardScreen() {
   const dailyTip = DAILY_TIPS[new Date().getDate() % DAILY_TIPS.length];
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      {/* Header with Profile Menu */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.greeting}>Welcome back, {userName}! 👋</Text>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Navigation Bar */}
+        <View style={styles.navBar}>
+          <Text style={styles.logo}>Rein</Text>
+          <View style={styles.navLinks}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard')}>
+              <Text style={[styles.navLink, styles.navLinkActive]}>Dashboard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/plan')}>
+              <Text style={styles.navLink}>My Plan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/sessions')}>
+              <Text style={styles.navLink}>Sessions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/plan')}>
+              <Text style={styles.navLink}>Library</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/chat')}>
+              <Text style={styles.navLink}>Ask a Trainer</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => setShowProfileMenu(!showProfileMenu)}
@@ -255,49 +289,49 @@ export default function DashboardScreen() {
               </Text>
             </View>
           </TouchableOpacity>
+          {showProfileMenu && (
+            <View style={styles.profileMenu}>
+              <TouchableOpacity
+                style={styles.profileMenuItem}
+                onPress={() => {
+                  setShowProfileMenu(false);
+                }}
+              >
+                <Text style={styles.profileMenuText}>Profile & Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.profileMenuItem}
+                onPress={() => {
+                  setShowProfileMenu(false);
+                  handleLogout();
+                }}
+              >
+                <Text style={[styles.profileMenuText, styles.profileMenuDanger]}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-        {showProfileMenu && (
-          <View style={styles.profileMenu}>
-            <TouchableOpacity
-              style={styles.profileMenuItem}
-              onPress={() => {
-                setShowProfileMenu(false);
-                // TODO: Navigate to profile/settings
-              }}
-            >
-              <Text style={styles.profileMenuText}>Profile & Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.profileMenuItem}
-              onPress={() => {
-                setShowProfileMenu(false);
-                handleLogout();
-              }}
-            >
-              <Text style={[styles.profileMenuText, styles.profileMenuDanger]}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        <Text style={styles.subGreeting}>{getPersonalizedMessage(completedLessons)}</Text>
-      </View>
 
-      {/* Progress Card */}
-      <Card style={styles.progressCard}>
-        <Text style={styles.cardTitle}>Your Progress</Text>
-        <ProgressBar
-          progress={progressPercentage}
-          showLabel={false}
-          style={styles.progressBar}
-        />
-        <Text style={styles.progressText}>
-          {completedLessons} of {totalLessons} lessons completed
-        </Text>
-        <View style={styles.statsRow}>
-          <StatBadge icon="🏆" value={skillsUnlocked} label="Skills" />
-          <StatBadge icon="📅" value={sessionsLogged} label="Sessions" />
+        {/* Hero Section with Background Image */}
+        <ImageBackground
+          source={{ uri: 'https://images.unsplash.com/photo-1516728788616-9a2c07a5d5d8?w=1920&q=80' }}
+          style={styles.heroSection}
+          imageStyle={styles.heroImage}
+        >
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroContent}>
+              <Text style={styles.heroTitle}>Welcome back, {userName}! 👋</Text>
+              <Text style={styles.heroSubtitle}>Let's start your training journey today.</Text>
+            </View>
+          </View>
+        </ImageBackground>
+
+        {/* Floating Stats Ribbon */}
+        <View style={styles.statsRibbon}>
+          <StatBadge icon="🏆" value={skillsUnlocked} label="Skills Mastered" />
+          <StatBadge icon="📅" value={sessionsLogged} label="Sessions Completed" />
           <StatBadge icon="🔥" value={streak} label="Day Streak" />
         </View>
-      </Card>
 
       {/* AI Training Plan Generator - Always show when no active plan */}
       {!activePlan && (
@@ -355,41 +389,88 @@ export default function DashboardScreen() {
         </Pressable>
       )}
 
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <QuickActionButton
-          icon="🤖"
-          label="New Plan"
-          onPress={() => router.push('/onboarding')}
-        />
-        <QuickActionButton
-          icon="💬"
-          label="Ask Trainer"
-          onPress={() => router.push('/(tabs)/chat')}
-        />
-        <QuickActionButton
-          icon="📝"
-          label="Log Session"
-          onPress={() => router.push('/(tabs)/sessions')}
-        />
-        <QuickActionButton
-          icon="📚"
-          label="All Lessons"
-          onPress={() => router.push('/(tabs)/plan')}
-        />
-        <QuickActionButton
-          icon="⭐"
-          label="Skills"
-          onPress={() => router.push('/(tabs)/skills')}
-        />
-      </View>
+      {/* Plan Status Warning */}
+      {planStatus && (!planStatus.exists || !planStatus.hasLessons) && (
+        <Card style={styles.planStatusCard}>
+          <Text style={styles.planStatusIcon}>⚠️</Text>
+          <View style={styles.planStatusContent}>
+            <Text style={styles.planStatusTitle}>
+              {!planStatus.exists ? 'No Training Plan' : 'Plan Generation Issue'}
+            </Text>
+            <Text style={styles.planStatusText}>
+              {!planStatus.exists
+                ? 'Create your personalized training plan to get started.'
+                : 'Your plan was created but has no lessons. Tap to regenerate.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.planStatusButton}
+              onPress={() => router.push('/onboarding')}
+            >
+              <Text style={styles.planStatusButtonText}>
+                {!planStatus.exists ? 'Create Plan' : 'Regenerate Plan'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+      )}
 
-      {/* Tip of the Day */}
-      <Card style={styles.tipCard}>
-        <Text style={styles.tipLabel}>💡 Trainer's Tip</Text>
-        <Text style={styles.tipText}>{dailyTip}</Text>
-      </Card>
-    </ScrollView>
+        {/* Main Dashboard Grid */}
+        <View style={styles.mainGrid}>
+          {/* Left Column - Quick Actions */}
+          <View style={styles.quickActionsColumn}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.quickActions}>
+              <QuickActionButton
+                icon="🤖"
+                label="New Plan"
+                onPress={() => router.push('/onboarding')}
+              />
+              <QuickActionButton
+                icon="💬"
+                label="Ask Trainer"
+                onPress={() => router.push('/(tabs)/chat')}
+              />
+              <QuickActionButton
+                icon="📝"
+                label="Log Session"
+                onPress={() => router.push('/(tabs)/sessions')}
+              />
+              <QuickActionButton
+                icon="📚"
+                label="All Lessons"
+                onPress={() => router.push('/(tabs)/plan')}
+              />
+            </View>
+          </View>
+
+          {/* Right Column - Sidebar Widgets */}
+          <View style={styles.sidebarColumn}>
+            {/* Trainer's Tip */}
+            <Card style={styles.trainerTipCard}>
+              <Text style={styles.trainerTipLabel}>💡 Trainer's Tip</Text>
+              <Text style={styles.trainerTipText}>
+                "{dailyTip}"
+              </Text>
+            </Card>
+
+            {/* Up Next Widget */}
+            <Card style={styles.upNextCard}>
+              <Text style={styles.upNextLabel}>Up Next</Text>
+              <View style={styles.upNextContent}>
+                <Text style={styles.upNextIcon}>📅</Text>
+                <Text style={styles.upNextText}>No upcoming sessions</Text>
+                <TouchableOpacity
+                  style={styles.upNextButton}
+                  onPress={() => router.push('/(tabs)/sessions')}
+                >
+                  <Text style={styles.upNextButtonText}>Schedule a session →</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -424,10 +505,15 @@ function QuickActionButton({
   );
 }
 
+const { width } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.neutral[50],
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -435,24 +521,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.neutral[50],
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    backgroundColor: colors.primary[500],
-    borderBottomLeftRadius: borderRadius.xl,
-    borderBottomRightRadius: borderRadius.xl,
-  },
-  headerContent: {
+  // Navigation Bar
+  navBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+    ...shadows.sm,
+    position: 'relative',
   },
-  greeting: {
-    ...typography.h1,
-    color: colors.neutral[50],
+  logo: {
+    ...typography.h2,
+    fontFamily: 'serif',
+    fontWeight: 'bold',
+    color: colors.neutral[900],
+  },
+  navLinks: {
+    flexDirection: 'row',
+    gap: spacing.lg,
     flex: 1,
+    justifyContent: 'center',
+    display: 'none', // Hide on mobile, show on larger screens if needed
+  },
+  navLink: {
+    ...typography.body,
+    color: colors.neutral[600],
+    fontWeight: '500',
+  },
+  navLinkActive: {
+    color: colors.neutral[900],
+    borderBottomWidth: 2,
+    borderBottomColor: colors.neutral[900],
+    paddingBottom: 2,
   },
   profileButton: {
     marginLeft: spacing.md,
@@ -461,20 +565,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.neutral[50],
+    backgroundColor: colors.neutral[800],
     justifyContent: 'center',
     alignItems: 'center',
   },
   profileIconText: {
     ...typography.h4,
-    color: colors.primary[500],
+    color: colors.surface,
     fontWeight: '700',
   },
   profileMenu: {
     position: 'absolute',
-    top: 100,
+    top: 60,
     right: spacing.lg,
-    backgroundColor: colors.neutral[50],
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.xs,
     minWidth: 180,
@@ -492,10 +596,41 @@ const styles = StyleSheet.create({
   profileMenuDanger: {
     color: colors.error,
   },
-  subGreeting: {
-    ...typography.body,
-    color: colors.neutral[50],
-    opacity: 0.9,
+  // Hero Section
+  heroSection: {
+    height: 300,
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  heroImage: {
+    resizeMode: 'cover',
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(42, 30, 21, 0.6)',
+  },
+  heroContent: {
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  heroTitle: {
+    ...typography.h1,
+    fontSize: 32,
+    color: colors.surface,
+    marginBottom: spacing.sm,
+  },
+  heroSubtitle: {
+    ...typography.bodyLarge,
+    fontSize: 18,
+    color: colors.neutral[100],
+  },
+  // Floating Stats Ribbon
+  statsRibbon: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.lg,
+    marginTop: -60,
+    gap: spacing.md,
+    zIndex: 10,
   },
   progressCard: {
     margin: spacing.lg,
@@ -530,22 +665,31 @@ const styles = StyleSheet.create({
   statBadge: {
     flex: 1,
     alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    ...shadows.md,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
   },
   statBadgeIcon: {
-    fontSize: 24,
-    marginBottom: spacing.xs / 2,
+    fontSize: 32,
+    marginBottom: spacing.sm,
   },
   statBadgeValue: {
-    ...typography.h4,
+    ...typography.h2,
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.neutral[900],
-    marginBottom: spacing.xs / 2,
+    marginBottom: spacing.xs,
   },
   statBadgeLabel: {
-    ...typography.caption,
+    ...typography.bodySmall,
+    fontSize: 12,
     color: colors.neutral[600],
+    textAlign: 'center',
+    fontWeight: '500',
   },
   planGeneratorCard: {
     margin: spacing.lg,
@@ -625,21 +769,42 @@ const styles = StyleSheet.create({
     color: colors.neutral[50],
     fontWeight: '600',
   },
+  // Main Grid
+  mainGrid: {
+    flexDirection: 'column',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    gap: spacing.lg,
+  },
+  quickActionsColumn: {
+    flex: 1,
+  },
+  sectionTitle: {
+    ...typography.h2,
+    fontSize: 24,
+    fontFamily: 'serif',
+    fontWeight: 'bold',
+    color: colors.neutral[900],
+    marginBottom: spacing.md,
+  },
   quickActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
     gap: spacing.md,
-    marginBottom: spacing.lg,
   },
   quickActionButton: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.neutral[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    minWidth: width < 400 ? '100%' : '45%',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
     alignItems: 'center',
     ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  sidebarColumn: {
+    gap: spacing.md,
   },
   quickActionIcon: {
     fontSize: 32,
@@ -650,21 +815,104 @@ const styles = StyleSheet.create({
     color: colors.neutral[900],
     fontWeight: '500',
   },
-  tipCard: {
-    margin: spacing.lg,
-    marginTop: 0,
+  // Trainer's Tip Card (Sage Green)
+  trainerTipCard: {
     padding: spacing.lg,
     backgroundColor: colors.secondary[50],
+    borderWidth: 1,
+    borderColor: colors.secondary[200],
   },
-  tipLabel: {
+  trainerTipLabel: {
     ...typography.body,
+    fontSize: 18,
+    fontFamily: 'serif',
     fontWeight: '600',
-    color: colors.secondary[700],
-    marginBottom: spacing.sm,
+    color: colors.neutral[900],
+    marginBottom: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  tipText: {
+  trainerTipText: {
     ...typography.body,
-    color: colors.neutral[800],
-    lineHeight: typography.body.lineHeight,
+    fontSize: 16,
+    color: colors.neutral[700],
+    lineHeight: 24,
+    fontStyle: 'italic',
+  },
+  // Up Next Widget
+  upNextCard: {
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  upNextLabel: {
+    ...typography.body,
+    fontSize: 18,
+    fontFamily: 'serif',
+    fontWeight: '600',
+    color: colors.neutral[900],
+    marginBottom: spacing.md,
+  },
+  upNextContent: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  upNextIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  upNextText: {
+    ...typography.body,
+    color: colors.neutral[600],
+    marginBottom: spacing.md,
+    fontSize: 14,
+  },
+  upNextButton: {
+    marginTop: spacing.sm,
+  },
+  upNextButtonText: {
+    ...typography.body,
+    color: colors.neutral[900],
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  planStatusCard: {
+    margin: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.warningBg,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    flexDirection: 'row',
+    padding: spacing.lg,
+  },
+  planStatusIcon: {
+    fontSize: 32,
+    marginRight: spacing.md,
+  },
+  planStatusContent: {
+    flex: 1,
+  },
+  planStatusTitle: {
+    ...typography.h4,
+    color: colors.warning,
+    marginBottom: spacing.xs,
+  },
+  planStatusText: {
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+    marginBottom: spacing.md,
+  },
+  planStatusButton: {
+    backgroundColor: colors.warning,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignSelf: 'flex-start',
+  },
+  planStatusButtonText: {
+    ...typography.bodySmall,
+    color: colors.surface,
+    fontWeight: '600',
   },
 });

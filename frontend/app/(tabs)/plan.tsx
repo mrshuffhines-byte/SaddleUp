@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -217,18 +218,6 @@ export default function PlanScreen() {
       modules: phase.modules.sort((a, b) => a.moduleNumber - b.moduleNumber),
     }));
 
-  // Calculate progress
-  const completedLessons = plan.lessons.filter((l) => l.isCompleted).length;
-  const totalLessons = plan.lessons.length;
-  const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-
-  // Calculate estimated weeks (assuming user's daysPerWeek from profile)
-  const daysPerWeek = plan.generatedContent?.daysPerWeek || 3;
-  const estimatedWeeksLeft = calculateEstimatedWeeks(
-    totalLessons - completedLessons,
-    daysPerWeek
-  );
-
   const formatGoal = (goal: string): string => {
     const goalMap: Record<string, string> = {
       learn_to_ride: 'Learn to Ride',
@@ -238,6 +227,75 @@ export default function PlanScreen() {
     };
     return goalMap[goal] || goal;
   };
+
+  // Calculate progress
+  const completedLessons = plan.lessons.filter((l) => l.isCompleted).length;
+  const totalLessons = plan.lessons.length;
+  const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+
+  // Check if plan has no lessons (error state)
+  if (totalLessons === 0) {
+    return (
+      <ScrollView style={styles.container}>
+        <Card style={styles.planHeaderCard}>
+          <Text style={styles.planTitle}>{formatGoal(plan.goal)} Training Plan</Text>
+          <View style={styles.errorStateContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorTitle}>Plan Generation Issue</Text>
+            <Text style={styles.errorDescription}>
+              Your training plan was created but doesn't contain any lessons. This usually happens when there was an issue during plan generation.
+            </Text>
+            <TouchableOpacity
+              style={styles.regenerateButton}
+              onPress={async () => {
+                try {
+                  const token = await AsyncStorage.getItem('authToken');
+                  if (!token) {
+                    router.replace('/(auth)/login');
+                    return;
+                  }
+
+                  // Regenerate plan
+                  const response = await fetch(`${API_URL}/api/training/generate-plan`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({}),
+                  });
+
+                  if (!response.ok) {
+                    throw new Error('Failed to regenerate plan');
+                  }
+
+                  // Reload plan
+                  await loadPlan();
+                } catch (error: any) {
+                  Alert.alert('Error', error.message || 'Failed to regenerate plan');
+                }
+              }}
+            >
+              <Text style={styles.regenerateButtonText}>Regenerate Plan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.backToOnboardingButton}
+              onPress={() => router.push('/onboarding')}
+            >
+              <Text style={styles.backToOnboardingButtonText}>Start Over</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+      </ScrollView>
+    );
+  }
+
+  // Calculate estimated weeks (assuming user's daysPerWeek from profile)
+  const daysPerWeek = plan.generatedContent?.daysPerWeek || 3;
+  const estimatedWeeksLeft = calculateEstimatedWeeks(
+    totalLessons - completedLessons,
+    daysPerWeek
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -549,5 +607,54 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.success,
     fontWeight: '600',
+  },
+  errorStateContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  errorIcon: {
+    fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  errorTitle: {
+    ...typography.h3,
+    color: colors.error,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  errorDescription: {
+    ...typography.body,
+    color: colors.neutral[600],
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  regenerateButton: {
+    backgroundColor: colors.primary[500],
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  regenerateButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
+  },
+  backToOnboardingButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.neutral[300],
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  backToOnboardingButtonText: {
+    ...typography.body,
+    color: colors.neutral[700],
+    fontWeight: '500',
   },
 });

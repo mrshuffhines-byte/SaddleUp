@@ -131,3 +131,4 @@ Methods are used throughout the application:
 - Categories help organize methods in UI
 - Founder field optional but helpful for attribution
 - Terminology and principles help AI understand method context
+

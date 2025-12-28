@@ -150,3 +150,4 @@ This creates truly personalized recommendations that work for the specific horse
 4. Create frontend screens for horse/facility profiles
 5. Update onboarding flow
 6. Add session context capture (weather, etc.)
+

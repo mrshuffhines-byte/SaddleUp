@@ -219,3 +219,4 @@ When updating the frontend:
 3. Add horse assignment UI (checkboxes, max 20)
 4. Update dashboard to show multiple plans
 5. Add plan management screens (create, edit, delete)
+

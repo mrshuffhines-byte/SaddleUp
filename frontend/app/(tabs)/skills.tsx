@@ -32,11 +32,36 @@ export default function SkillsScreen() {
   const [skills, setSkills] = useState<SkillsData | null>(null);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasValidPlan, setHasValidPlan] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     loadData();
+    checkPlan();
   }, []);
+
+  const checkPlan = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/training/plan`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const plan = await response.json();
+        setHasValidPlan(plan && plan.lessons && plan.lessons.length > 0);
+      } else {
+        setHasValidPlan(false);
+      }
+    } catch (error) {
+      console.error('Check plan error:', error);
+      setHasValidPlan(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -138,9 +163,13 @@ export default function SkillsScreen() {
           <EmptyState
             icon="🏆"
             title="Skills Await!"
-            description="Complete lessons to unlock skills and watch your abilities grow."
-            actionLabel="Start First Lesson"
-            onAction={() => router.push('/(tabs)/plan')}
+            description={
+              hasValidPlan === false
+                ? "Create a training plan to get started. Complete lessons to unlock skills and watch your abilities grow."
+                : "Complete lessons to unlock skills and watch your abilities grow."
+            }
+            actionLabel={hasValidPlan === false ? "Create Training Plan" : "Start First Lesson"}
+            onAction={() => router.push(hasValidPlan === false ? '/onboarding' : '/(tabs)/plan')}
           />
         )}
       </View>

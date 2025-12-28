@@ -112,3 +112,4 @@ Currently includes sample methods from:
 5. Add video analysis with timestamp markers
 6. Create method info/education screens
 7. Add suggested questions based on current lesson
+

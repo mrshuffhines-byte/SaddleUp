@@ -35,3 +35,4 @@ Place the following image files in this directory:
 - Test on both light and dark backgrounds
 
 You can create placeholder images using any image editor or use online icon generators.
+

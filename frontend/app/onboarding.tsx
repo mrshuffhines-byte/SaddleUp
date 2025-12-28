@@ -27,7 +27,7 @@ import { Button, ProgressBar, ScreenBackground } from '../components/ui';
 import Card from '../components/ui/Card';
 import { Input } from '../components/ui';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6; // Step 4 split into 4A (basic info) and 4B (training/issues)
 
 const EXPERIENCE_LEVELS = [
   {
@@ -158,6 +158,8 @@ export default function OnboardingScreen() {
   const [methods, setMethods] = useState<any[]>([]);
   const [loadingMethods, setLoadingMethods] = useState(false);
   const [methodsError, setMethodsError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>('');
+  const [planGenerationError, setPlanGenerationError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load methods when component mounts (for step 5)
@@ -201,22 +203,35 @@ export default function OnboardingScreen() {
       Alert.alert('Please select', 'Please select your time commitment');
       return;
     }
-    if (step === 4 && formData.ownsHorse && !formData.horseName.trim()) {
-      Alert.alert('Horse name required', 'Please enter your horse\'s name');
-      return;
+    // Step 4: Basic horse info - no validation needed (all optional)
+    // Step 5: Training status - no validation needed (all optional), skip if doesn't own horse
+    // Step 6: Method selection validation
+    if ((step === 5 && !formData.ownsHorse) || step === 6) {
+      // This is the method selection step
+      if (formData.methodPreference !== 'explore' && formData.selectedMethods.length === 0) {
+        Alert.alert('Please select', 'Please select at least one horsemanship method');
+        return;
+      }
     }
-    if (step === 5 && formData.methodPreference !== 'explore' && formData.selectedMethods.length === 0) {
-      Alert.alert('Please select', 'Please select at least one horsemanship method');
-      return;
-    }
+    
     if (step < TOTAL_STEPS) {
-      setStep(step + 1);
+      // Skip step 5 if user doesn't own a horse
+      if (step === 4 && !formData.ownsHorse) {
+        setStep(6); // Skip to method selection
+      } else {
+        setStep(step + 1);
+      }
     }
   };
 
   const handleBack = () => {
     if (step > 1) {
-      setStep(step - 1);
+      // Skip step 5 when going back if user doesn't own a horse
+      if (step === 6 && !formData.ownsHorse) {
+        setStep(4);
+      } else {
+        setStep(step - 1);
+      }
     }
   };
 
@@ -229,14 +244,13 @@ export default function OnboardingScreen() {
     });
   };
 
-  const handleSubmit = async () => {
-    // Validate horse name if ownsHorse is true
-    if (formData.ownsHorse && !formData.horseName.trim()) {
-      Alert.alert('Horse name required', 'Please enter your horse\'s name');
-      return;
-    }
+  const handleSubmit = async (retry = false) => {
+    // Horse name is now optional - no validation needed
 
     setLoading(true);
+    setPlanGenerationError(null);
+    setLoadingMessage('Saving your profile...');
+
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
@@ -245,6 +259,7 @@ export default function OnboardingScreen() {
       }
 
       // Save profile
+      setLoadingMessage('Saving your profile...');
       const profileResponse = await fetch(`${API_URL}/api/user/profile`, {
         method: 'POST',
         headers: {
@@ -266,13 +281,15 @@ export default function OnboardingScreen() {
       });
 
       if (!profileResponse.ok) {
-        throw new Error('Failed to save profile');
+        const errorData = await profileResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save profile');
       }
 
       let horseId = null;
 
-      // Create horse profile if user owns a horse
+      // Create horse profile if user owns a horse and provided at least a name
       if (formData.ownsHorse && formData.horseName.trim()) {
+        setLoadingMessage('Creating horse profile...');
         const horseData: any = {
           name: formData.horseName.trim(),
         };
@@ -281,14 +298,12 @@ export default function OnboardingScreen() {
         if (formData.horseAge) horseData.age = formData.horseAge;
         if (formData.horseSex) horseData.sex = formData.horseSex;
         if (formData.horseTemperament) {
-          // Store temperament as array for consistency with schema
           horseData.temperament = [formData.horseTemperament];
         }
         if (formData.horseTrained) {
           horseData.isProfessionallyTrained = formData.horseTrained === 'Yes';
         }
         if (formData.horseIssues.length > 0) {
-          // Filter out "None that I know of" if other issues are selected
           const issues = formData.horseIssues.filter(i => i !== 'None that I know of');
           if (issues.length > 0) {
             horseData.knownIssues = issues;
@@ -306,15 +321,22 @@ export default function OnboardingScreen() {
         });
 
         if (!horseResponse.ok) {
-          throw new Error('Failed to create horse profile');
+          const errorData = await horseResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to create horse profile');
         }
 
         const horse = await horseResponse.json();
         horseId = horse.id;
       }
 
-      // Generate training plan with horse ID if available
-      const planResponse = await fetch(`${API_URL}/api/training/generate-plan`, {
+      // Generate training plan with timeout
+      setLoadingMessage('Creating your training plan... This usually takes 10-15 seconds.');
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out. Please check your internet connection and try again.')), 30000); // 30 second timeout
+      });
+
+      const planPromise = fetch(`${API_URL}/api/training/generate-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -325,19 +347,51 @@ export default function OnboardingScreen() {
         }),
       });
 
+      const planResponse = await Promise.race([planPromise, timeoutPromise]) as Response;
+
       if (!planResponse.ok) {
-        throw new Error('Failed to generate training plan');
+        const errorData = await planResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Failed to generate training plan');
       }
 
+      const planData = await planResponse.json();
+
+      // Validate that plan has lessons
+      if (!planData.lessons || planData.lessons.length === 0) {
+        throw new Error('Training plan was created but contains no lessons. Please try again.');
+      }
+
+      setLoadingMessage('Plan created successfully! Redirecting...');
+      
+      // Small delay to show success message
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       router.replace('/(tabs)/dashboard');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to complete onboarding');
+      console.error('Onboarding error:', error);
+      const errorMessage = error.message || 'Failed to complete onboarding. Please try again.';
+      setPlanGenerationError(errorMessage);
+      setLoading(false);
+      
+      // Don't show alert if it's a retry - let the user see the error message on screen
+      if (!retry) {
+        Alert.alert('Error', errorMessage);
+      }
     } finally {
       setLoading(false);
+      setLoadingMessage('');
     }
   };
 
-  const progress = (step / TOTAL_STEPS) * 100;
+  // Calculate progress accounting for skipped steps
+  const getEffectiveStep = () => {
+    if (step <= 4) return step;
+    if (step === 5 && !formData.ownsHorse) return 5; // Step 5 is skipped, but we're at step 6
+    if (step === 6 && !formData.ownsHorse) return 5; // Step 5 was skipped
+    return step;
+  };
+  const effectiveStep = getEffectiveStep();
+  const progress = (effectiveStep / TOTAL_STEPS) * 100;
 
   const handleBackToDashboard = () => {
     Alert.alert(
@@ -382,7 +436,7 @@ export default function OnboardingScreen() {
               showLabel={false}
               style={styles.progressBar}
             />
-            <Text style={styles.stepText}>Step {step} of {TOTAL_STEPS}</Text>
+            <Text style={styles.stepText}>Step {effectiveStep} of {TOTAL_STEPS}</Text>
           </View>
 
           {/* Step 1: Experience Level */}
@@ -534,7 +588,7 @@ export default function OnboardingScreen() {
             </View>
           )}
 
-          {/* Step 4: Horse Details */}
+          {/* Step 4: Horse Ownership & Basic Info */}
           {step === 4 && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepTitle}>Do you have a horse?</Text>
@@ -561,17 +615,40 @@ export default function OnboardingScreen() {
 
                 {formData.ownsHorse ? (
                   <View style={styles.horseProfileSection}>
-                    <Text style={styles.sectionTitle}>Tell us about your horse</Text>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>Basic Information</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFormData({ 
+                            ...formData, 
+                            ownsHorse: false,
+                            horseName: '',
+                            horseAge: '',
+                            horseSex: '',
+                            horseTemperament: '',
+                            horseTrained: '',
+                            horseIssues: [],
+                            horseNotes: '',
+                          });
+                        }}
+                        style={styles.skipButton}
+                      >
+                        <Text style={styles.skipButtonText}>Skip for now</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.optionalNote}>
+                      All fields are optional. You can add details later.
+                    </Text>
                     
                     <Input
-                      label="Horse's Name *"
-                      placeholder="What's your horse's name?"
+                      label="Horse's Name"
+                      placeholder="What's your horse's name? (optional)"
                       value={formData.horseName}
                       onChangeText={(text) => setFormData({ ...formData, horseName: text })}
                       containerStyle={styles.inputContainer}
                     />
 
-                    <Text style={styles.formLabel}>Horse's age</Text>
+                    <Text style={styles.formLabel}>Horse's age <Text style={styles.optionalTag}>(optional)</Text></Text>
                     <View style={styles.ageButtons}>
                       {AGE_OPTIONS.map((age) => (
                         <TouchableOpacity
@@ -595,7 +672,7 @@ export default function OnboardingScreen() {
                       ))}
                     </View>
 
-                    <Text style={styles.formLabel}>How would you describe your horse's temperament?</Text>
+                    <Text style={styles.formLabel}>How would you describe your horse's temperament? <Text style={styles.optionalTag}>(optional)</Text></Text>
                     <View style={styles.temperamentOptions}>
                       {TEMPERAMENT_OPTIONS.map((temp) => (
                         <TouchableOpacity
@@ -649,57 +726,6 @@ export default function OnboardingScreen() {
                         </View>
                       </View>
                     )}
-
-                    <Text style={styles.formLabel}>Has this horse been professionally trained?</Text>
-                    <View style={styles.radioGroup}>
-                      {['Yes', 'No', "I don't know"].map((opt) => (
-                        <TouchableOpacity
-                          key={opt}
-                          style={[
-                            styles.radioButton,
-                            formData.horseTrained === opt && styles.radioSelected,
-                          ]}
-                          onPress={() => setFormData({ ...formData, horseTrained: opt })}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.radioButtonText,
-                              formData.horseTrained === opt && styles.radioButtonTextSelected,
-                            ]}
-                          >
-                            {opt}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    <Text style={styles.formLabel}>Does your horse have any known issues? (Select all that apply)</Text>
-                    <View style={styles.checkboxGroup}>
-                      {HORSE_ISSUES.map((issue) => (
-                        <TouchableOpacity
-                          key={issue}
-                          style={[
-                            styles.checkboxItem,
-                            formData.horseIssues.includes(issue) && styles.checkboxItemSelected,
-                          ]}
-                          onPress={() => toggleIssue(issue)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.checkboxIcon}>
-                            {formData.horseIssues.includes(issue) ? '☑' : '☐'}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.checkboxText,
-                              formData.horseIssues.includes(issue) && styles.checkboxTextSelected,
-                            ]}
-                          >
-                            {issue}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
                   </View>
                 ) : (
                   <View style={styles.noHorseSection}>
@@ -740,12 +766,85 @@ export default function OnboardingScreen() {
             </View>
           )}
 
-          {/* Step 5: Horsemanship Method Selection */}
-          {step === 5 && (
+          {/* Step 5: Training Status & Known Issues (only if owns horse) */}
+          {step === 5 && formData.ownsHorse && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>Training & Behavior</Text>
+              <Text style={styles.stepSubtitle}>
+                Help us understand your horse's training background and any challenges
+              </Text>
+
+              <Card style={styles.horseCard}>
+                <View style={styles.horseProfileSection}>
+                  <Text style={styles.sectionTitle}>Training Status</Text>
+                  <Text style={styles.optionalNote}>
+                    All fields are optional. You can add details later.
+                  </Text>
+
+                  <Text style={styles.formLabel}>Has this horse been professionally trained? <Text style={styles.optionalTag}>(optional)</Text></Text>
+                  <View style={styles.radioGroup}>
+                    {['Yes', 'No', "I don't know"].map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          styles.radioButton,
+                          formData.horseTrained === opt && styles.radioSelected,
+                        ]}
+                        onPress={() => setFormData({ ...formData, horseTrained: opt })}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.radioButtonText,
+                            formData.horseTrained === opt && styles.radioButtonTextSelected,
+                          ]}
+                        >
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.formLabel}>Does your horse have any known issues? <Text style={styles.optionalTag}>(optional)</Text></Text>
+                  <Text style={styles.formHelperText}>
+                    Select all that apply. This helps us tailor safety recommendations.
+                  </Text>
+                  <View style={styles.checkboxGroup}>
+                    {HORSE_ISSUES.map((issue) => (
+                      <TouchableOpacity
+                        key={issue}
+                        style={[
+                          styles.checkboxItem,
+                          formData.horseIssues.includes(issue) && styles.checkboxItemSelected,
+                        ]}
+                        onPress={() => toggleIssue(issue)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.checkboxIcon}>
+                          {formData.horseIssues.includes(issue) ? '☑' : '☐'}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.checkboxText,
+                            formData.horseIssues.includes(issue) && styles.checkboxTextSelected,
+                          ]}
+                        >
+                          {issue}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </Card>
+            </View>
+          )}
+
+          {/* Step 5/6: Horsemanship Method Selection */}
+          {((step === 5 && !formData.ownsHorse) || step === 6) && (
             <View style={styles.stepContainer}>
               <Text style={styles.stepTitle}>What horsemanship approach interests you?</Text>
               <Text style={styles.stepSubtitle}>
-                We'll blend methods to create the best training for you and your horse
+                Choose how you'd like to learn. This affects the style and techniques in your training plan.
               </Text>
 
               {/* Preference Selection */}
@@ -769,6 +868,14 @@ export default function OnboardingScreen() {
                     <Text style={[styles.preferenceDesc, formData.methodPreference === 'explore' && styles.preferenceDescSelected]}>
                       Show me techniques from various methods - I want to learn what works
                     </Text>
+                    {formData.methodPreference === 'explore' && (
+                      <View style={[styles.previewBox, { backgroundColor: colors.infoBg, borderColor: colors.info }]}>
+                        <Text style={styles.previewTitle}>What to expect:</Text>
+                        <Text style={styles.previewText}>• Mix of groundwork styles (natural horsemanship, classical, positive reinforcement)</Text>
+                        <Text style={styles.previewText}>• Example lessons: "Leading respectfully", "Personal space boundaries", "Building trust through approach"</Text>
+                        <Text style={styles.previewText}>• Great for beginners who want to discover their preferred style</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -788,6 +895,14 @@ export default function OnboardingScreen() {
                     <Text style={[styles.preferenceDesc, formData.methodPreference === 'blend' && styles.preferenceDescSelected]}>
                       Combine techniques from multiple methods I'm interested in
                     </Text>
+                    {formData.methodPreference === 'blend' && (
+                      <View style={[styles.previewBox, { backgroundColor: colors.accent[50], borderColor: colors.accent[200] }]}>
+                        <Text style={styles.previewTitle}>What to expect:</Text>
+                        <Text style={styles.previewText}>• Techniques from 2-4 methods you select below</Text>
+                        <Text style={styles.previewText}>• Example: Parelli's "Seven Games" combined with clicker training principles</Text>
+                        <Text style={styles.previewText}>• Best for riders familiar with specific methods who want a custom blend</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -807,6 +922,14 @@ export default function OnboardingScreen() {
                     <Text style={[styles.preferenceDesc, formData.methodPreference === 'single' && styles.preferenceDescSelected]}>
                       I want to focus on a specific training method
                     </Text>
+                    {formData.methodPreference === 'single' && (
+                      <View style={[styles.previewBox, { backgroundColor: colors.secondary[50], borderColor: colors.secondary[200] }]}>
+                        <Text style={styles.previewTitle}>What to expect:</Text>
+                        <Text style={styles.previewText}>• All lessons follow one method's philosophy and techniques</Text>
+                        <Text style={styles.previewText}>• Example: If you choose Parelli, you'll learn the Seven Games progression</Text>
+                        <Text style={styles.previewText}>• Best for riders committed to a specific method or preparing for certification</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </View>
               </Card>
@@ -926,13 +1049,33 @@ export default function OnboardingScreen() {
                 fullWidth={step === 1}
               />
             ) : (
-              <Button
-                title={loading ? 'Generating Plan...' : 'Generate My Training Plan →'}
-                onPress={handleSubmit}
-                loading={loading}
-                style={styles.submitButton}
-                fullWidth
-              />
+              <View>
+                {planGenerationError && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{planGenerationError}</Text>
+                    <Button
+                      title="Try Again"
+                      onPress={() => handleSubmit(true)}
+                      variant="outline"
+                      style={styles.retryButton}
+                    />
+                  </View>
+                )}
+                {loading && loadingMessage && (
+                  <View style={styles.loadingMessageContainer}>
+                    <ActivityIndicator size="small" color={colors.primary[500]} style={{ marginRight: spacing.sm }} />
+                    <Text style={styles.loadingMessageText}>{loadingMessage}</Text>
+                  </View>
+                )}
+                <Button
+                  title={loading ? 'Creating Your Plan...' : 'Generate My Training Plan →'}
+                  onPress={() => handleSubmit(false)}
+                  loading={loading}
+                  disabled={loading}
+                  style={styles.submitButton}
+                  fullWidth
+                />
+              </View>
             )}
           </View>
         </View>
@@ -969,7 +1112,8 @@ function OptionCard({
     return {
       transform: [{ scale: scale.value }],
       backgroundColor: bgColor,
-      borderColor: backgroundColor.value === 1 ? colors.primary[600] : colors.neutral[200],
+      borderColor: backgroundColor.value === 1 ? colors.primary[700] : colors.neutral[200], // Darker border for better contrast
+      borderWidth: backgroundColor.value === 1 ? 3 : 2, // Thicker border when selected
     };
   });
 
@@ -1070,9 +1214,10 @@ const styles = StyleSheet.create({
   },
   stepSubtitle: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     color: colors.neutral[600],
     marginBottom: spacing.lg,
-    lineHeight: typography.body.lineHeight,
+    lineHeight: 24,
   },
   contextText: {
     ...typography.body,
@@ -1092,6 +1237,8 @@ const styles = StyleSheet.create({
   optionCard: {
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
+    paddingVertical: spacing.lg + 4,
+    minHeight: 100, // Better touch target for option cards
     borderWidth: 2,
     alignItems: 'center',
     ...shadows.sm,
@@ -1110,13 +1257,15 @@ const styles = StyleSheet.create({
   },
   optionLabel: {
     ...typography.h4,
+    fontSize: 18, // Ensure readable size
     marginBottom: spacing.xs,
     fontWeight: typography.weights.semibold,
   },
   optionDescription: {
     ...typography.bodySmall,
+    fontSize: 15, // Slightly larger for better readability
     textAlign: 'center',
-    lineHeight: typography.bodySmall.lineHeight,
+    lineHeight: 20,
   },
   checkmark: {
     position: 'absolute',
@@ -1140,6 +1289,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     fontWeight: '600',
     color: colors.neutral[900],
     marginBottom: spacing.md,
@@ -1155,19 +1305,25 @@ const styles = StyleSheet.create({
   timeOption: {
     flex: 1,
     minWidth: 100,
+    minHeight: 44, // Minimum touch target
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4,
     borderWidth: 2,
     borderColor: colors.neutral[200],
     alignItems: 'center',
+    justifyContent: 'center',
   },
   timeOptionSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
+    borderColor: colors.primary[700], // Darker for better contrast
+    borderWidth: 3,
+    ...shadows.sm,
   },
   timeOptionText: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     fontWeight: '500',
     color: colors.neutral[900],
   },
@@ -1182,11 +1338,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
+    paddingVertical: spacing.sm, // Extra padding for better touch target
+    minHeight: 44, // Minimum touch target
   },
   toggleLabel: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     fontWeight: '600',
     color: colors.neutral[900],
+    flex: 1,
   },
   toggleSwitch: {
     width: 50,
@@ -1197,7 +1357,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   toggleSwitchOn: {
-    backgroundColor: colors.primary[500],
+    backgroundColor: colors.primary[600], // Darker for better contrast
   },
   toggleCircle: {
     width: 26,
@@ -1229,19 +1389,25 @@ const styles = StyleSheet.create({
   timeGapButton: {
     flex: 1,
     minWidth: 100,
+    minHeight: 44, // Minimum touch target
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4,
     borderWidth: 2,
     borderColor: colors.neutral[200],
     alignItems: 'center',
+    justifyContent: 'center',
   },
   timeGapSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
+    borderColor: colors.primary[700], // Darker for better contrast
+    borderWidth: 3,
+    ...shadows.sm,
   },
   timeGapText: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     fontWeight: '500',
     color: colors.neutral[900],
   },
@@ -1270,10 +1436,37 @@ const styles = StyleSheet.create({
   horseProfileSection: {
     marginTop: spacing.md,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
   sectionTitle: {
     ...typography.h3,
     color: colors.neutral[900],
+    flex: 1,
+  },
+  skipButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  skipButtonText: {
+    ...typography.bodySmall,
+    color: colors.primary[500],
+    fontWeight: '600',
+  },
+  optionalNote: {
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    fontStyle: 'italic',
     marginBottom: spacing.md,
+  },
+  optionalTag: {
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    fontStyle: 'italic',
+    fontWeight: '400',
   },
   ageButtons: {
     flexDirection: 'row',
@@ -1284,12 +1477,15 @@ const styles = StyleSheet.create({
   ageButton: {
     flex: 1,
     minWidth: 80,
+    minHeight: 44, // Minimum touch target size
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4, // Extra vertical padding for better touch target
     borderWidth: 2,
     borderColor: colors.neutral[200],
     alignItems: 'center',
+    justifyContent: 'center',
   },
   ageButtonSelected: {
     backgroundColor: colors.primary[500],
@@ -1297,6 +1493,7 @@ const styles = StyleSheet.create({
   },
   ageButtonText: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px for readability
     fontWeight: '500',
     color: colors.neutral[900],
   },
@@ -1311,20 +1508,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4, // Better touch target
+    minHeight: 60, // Minimum touch target for cards
     borderWidth: 2,
     borderColor: colors.neutral[200],
   },
   tempButtonSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
+    borderColor: colors.primary[700], // Darker border for better contrast
+    borderWidth: 3, // Thicker border when selected
+    ...shadows.md, // Add shadow for better visibility
   },
   tempLabel: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     fontWeight: typography.weights.semibold,
     color: colors.neutral[900],
     marginBottom: spacing.xs / 2,
   },
   tempLabelSelected: {
+    fontSize: 16,
     color: colors.neutral[50],
   },
   tempDesc: {
@@ -1370,15 +1573,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4,
+    minHeight: 44, // Minimum touch target
     borderWidth: 2,
     borderColor: colors.neutral[200],
   },
   radioSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
+    borderColor: colors.primary[700], // Darker for better contrast
+    borderWidth: 3,
+    ...shadows.sm,
   },
   radioButtonText: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     color: colors.neutral[900],
   },
   radioButtonTextSelected: {
@@ -1394,12 +1602,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4,
+    minHeight: 44, // Minimum touch target
     borderWidth: 2,
     borderColor: colors.neutral[200],
   },
   checkboxItemSelected: {
-    backgroundColor: colors.primary[50],
-    borderColor: colors.primary[300],
+    backgroundColor: colors.primary[100], // More visible than 50
+    borderColor: colors.primary[500], // Stronger border
+    borderWidth: 2.5,
   },
   checkboxIcon: {
     fontSize: typography.body.fontSize,
@@ -1408,6 +1619,7 @@ const styles = StyleSheet.create({
   },
   checkboxText: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     color: colors.neutral[900],
     flex: 1,
   },
@@ -1430,15 +1642,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    paddingVertical: spacing.md + 4,
+    minHeight: 60, // Better touch target for option cards
     borderWidth: 2,
     borderColor: colors.neutral[200],
   },
   optButtonSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
+    borderColor: colors.primary[700], // Darker for better contrast
+    borderWidth: 3,
+    ...shadows.md,
   },
   optLabel: {
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px
     fontWeight: typography.weights.semibold,
     color: colors.neutral[900],
     marginBottom: spacing.xs / 2,
@@ -1465,6 +1682,12 @@ const styles = StyleSheet.create({
     color: colors.neutral[700],
     marginBottom: spacing.xs,
     marginTop: spacing.md,
+  },
+  formHelperText: {
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    fontStyle: 'italic',
+    marginBottom: spacing.sm,
   },
   inputContainer: {
     marginBottom: spacing.md,
@@ -1563,14 +1786,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
+    paddingVertical: spacing.lg + 4,
+    minHeight: 80, // Better touch target for preference cards
     borderWidth: 2,
     borderColor: colors.neutral[200],
     ...shadows.sm,
   },
   preferenceOptionSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
-    ...shadows.md,
+    borderColor: colors.primary[800], // Much darker for better contrast
+    borderWidth: 3,
+    ...shadows.lg, // Stronger shadow when selected
   },
   preferenceIcon: {
     fontSize: 32,
@@ -1578,6 +1804,7 @@ const styles = StyleSheet.create({
   },
   preferenceLabel: {
     ...typography.h4,
+    fontSize: 18, // Ensure readable size
     color: colors.neutral[900],
     marginBottom: spacing.xs,
     fontWeight: typography.weights.semibold,
@@ -1587,10 +1814,30 @@ const styles = StyleSheet.create({
   },
   preferenceDesc: {
     ...typography.bodySmall,
+    fontSize: 15, // Slightly larger for better readability
     color: colors.neutral[600],
+    lineHeight: 20,
   },
   preferenceDescSelected: {
     color: colors.primary[100],
+  },
+  previewBox: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  previewTitle: {
+    ...typography.bodySmall,
+    fontWeight: '600',
+    color: colors.neutral[900],
+    marginBottom: spacing.xs,
+  },
+  previewText: {
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+    marginBottom: spacing.xs / 2,
+    lineHeight: 20,
   },
   methodSelectionCard: {
     marginTop: spacing.md,
@@ -1613,22 +1860,28 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   methodChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md + 4,
+    paddingVertical: spacing.sm + 4,
+    minHeight: 44, // Minimum touch target
     borderRadius: borderRadius.full,
     borderWidth: 2,
     borderColor: colors.neutral[300],
     backgroundColor: colors.neutral[50],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   methodChipSelected: {
     backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
+    borderColor: colors.primary[700], // Darker for better contrast
+    borderWidth: 3,
+    ...shadows.sm,
   },
   methodChipDisabled: {
     opacity: 0.5,
   },
   methodChipText: {
     ...typography.bodySmall,
+    fontSize: 15, // Slightly larger for better readability
     color: colors.neutral[700],
   },
   methodChipTextSelected: {
@@ -1703,6 +1956,29 @@ const styles = StyleSheet.create({
     flex: 2,
   },
   submitButton: {
+    flex: 1,
+  },
+  errorContainer: {
+    backgroundColor: colors.errorBg,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  loadingMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary[50],
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  loadingMessageText: {
+    ...typography.bodySmall,
+    color: colors.primary[700],
     flex: 1,
   },
 });

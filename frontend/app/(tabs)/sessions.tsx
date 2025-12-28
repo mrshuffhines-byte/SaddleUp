@@ -16,11 +16,36 @@ import { EmptyState } from '../../components/ui';
 export default function SessionsScreen() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasValidPlan, setHasValidPlan] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     loadSessions();
+    checkPlan();
   }, []);
+
+  const checkPlan = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/training/plan`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const plan = await response.json();
+        setHasValidPlan(plan && plan.lessons && plan.lessons.length > 0);
+      } else {
+        setHasValidPlan(false);
+      }
+    } catch (error) {
+      console.error('Check plan error:', error);
+      setHasValidPlan(false);
+    }
+  };
 
   const loadSessions = async () => {
     try {
@@ -66,9 +91,13 @@ export default function SessionsScreen() {
           <EmptyState
             icon="📝"
             title="No Sessions Yet"
-            description="After you complete a lesson, log your training session to track your progress."
-            actionLabel="View Training Plan"
-            onAction={() => router.push('/(tabs)/plan')}
+            description={
+              hasValidPlan === false
+                ? "Create a training plan to get started. Once you complete lessons, you can log your training sessions here."
+                : "After you complete a lesson, log your training session to track your progress."
+            }
+            actionLabel={hasValidPlan === false ? "Create Training Plan" : "View Training Plan"}
+            onAction={() => router.push(hasValidPlan === false ? '/onboarding' : '/(tabs)/plan')}
           />
         ) : (
           sessions.map((session) => (

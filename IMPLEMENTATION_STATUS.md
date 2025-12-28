@@ -93,3 +93,4 @@
    - Links to horse and facility
    - Captures weather/conditions
    - Notes become part of context for future recommendations
+

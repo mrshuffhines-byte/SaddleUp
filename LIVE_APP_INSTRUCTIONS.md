@@ -59,3 +59,4 @@ npx expo start --port 3000
 - Run `npm run db:push` in backend directory
 
 Enjoy your SaddleUp app! 🐴
+

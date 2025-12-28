@@ -172,3 +172,4 @@ The skill will be automatically created when first unlocked.
 4. Test celebration alerts when skills unlock
 5. Verify skills page displays correctly
 6. Test empty states for new users
+

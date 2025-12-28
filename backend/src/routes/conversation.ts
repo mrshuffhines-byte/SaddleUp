@@ -147,3 +147,4 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 export default router;
+

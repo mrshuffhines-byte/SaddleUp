@@ -171,3 +171,4 @@ This implementation adds horsemanship method selection, comparison features, and
 - [ ] Method categories display properly
 - [ ] "No preference" option works
 - [ ] Comparison feature works with different methods
+

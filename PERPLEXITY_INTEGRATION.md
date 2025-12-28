@@ -116,3 +116,4 @@ To test the Perplexity integration:
 4. Test training plan generation: `POST /api/training/generate-plan`
 
 Check server logs for any API errors or issues.
+

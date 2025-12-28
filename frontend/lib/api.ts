@@ -55,3 +55,4 @@ export const api = {
     }),
   delete: (endpoint: string) => apiRequest(endpoint, { method: 'DELETE' }),
 };
+

@@ -3,3 +3,4 @@ declare module 'streamifier' {
   function createReadStream(buffer: Buffer): Readable;
   export = { createReadStream };
 }
+

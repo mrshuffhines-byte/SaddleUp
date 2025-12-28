@@ -106,3 +106,4 @@ export function LockedBadge() {
   return <Badge variant="default" size="sm">🔒 Locked</Badge>;
 }
 
+

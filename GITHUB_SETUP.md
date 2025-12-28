@@ -127,3 +127,4 @@ git checkout main
 **Authentication issues:**
 - Use GitHub Personal Access Token or SSH keys
 - See: https://docs.github.com/en/authentication
+

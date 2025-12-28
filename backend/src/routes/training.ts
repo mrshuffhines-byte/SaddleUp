@@ -2,6 +2,7 @@ import express, { Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { generateTrainingPlan } from '../lib/claude';
+import { generateFallbackPlan } from '../lib/fallback-plan';
 import { checkAndUnlockSkills, getUserSkills, getMilestones } from '../lib/skills';
 import { customAlphabet } from 'nanoid';
 const generateVisibleId = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 8);
@@ -43,23 +44,39 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
       }
     }
 
-    // Generate plan with AI
+    // Generate plan with AI, fallback to basic plan if AI fails
     let planData;
+    let usedFallback = false;
+    const onboardingData = {
+      experienceLevel: profile.experienceLevel,
+      primaryGoal: profile.primaryGoal,
+      daysPerWeek: profile.daysPerWeek,
+      sessionLength: profile.sessionLength,
+      ownsHorse: profile.ownsHorse,
+      horseDetails: profile.horseDetails || undefined,
+    };
+
     try {
-      planData = await generateTrainingPlan({
-        experienceLevel: profile.experienceLevel,
-        primaryGoal: profile.primaryGoal,
-        daysPerWeek: profile.daysPerWeek,
-        sessionLength: profile.sessionLength,
-        ownsHorse: profile.ownsHorse,
-        horseDetails: profile.horseDetails || undefined,
-      });
+      console.log('Attempting to generate training plan with AI...');
+      planData = await generateTrainingPlan(onboardingData);
+      console.log(`Successfully generated plan with ${planData.phases.length} phases`);
     } catch (error) {
-      console.error('Training plan generation error:', error);
-      return res.status(500).json({ 
-        error: 'Failed to generate training plan',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
+      console.error('AI training plan generation failed, using fallback plan:', error);
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+      
+      // Use fallback plan
+      try {
+        planData = generateFallbackPlan(onboardingData);
+        usedFallback = true;
+        console.log(`Fallback plan generated with ${planData.phases.length} phases`);
+      } catch (fallbackError) {
+        console.error('Fallback plan generation also failed:', fallbackError);
+        return res.status(500).json({ 
+          error: 'Failed to generate training plan',
+          message: 'Both AI and fallback plan generation failed',
+          details: process.env.NODE_ENV === 'development' ? (fallbackError instanceof Error ? fallbackError.message : 'Unknown error') : undefined
+        });
+      }
     }
 
     // Create visible ID (human-readable)
@@ -106,9 +123,20 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
       }
     }
 
+    if (lessons.length === 0) {
+      console.error('No lessons generated in plan!');
+      return res.status(500).json({ 
+        error: 'Failed to generate training plan',
+        message: 'Plan was created but contains no lessons',
+        details: 'This should not happen - please contact support'
+      });
+    }
+
+    console.log(`Creating ${lessons.length} lesson records...`);
     await prisma.lesson.createMany({
       data: lessons,
     });
+    console.log(`Successfully created ${lessons.length} lessons`);
 
     // Fetch the complete plan with lessons and horses
     const completePlan = await prisma.trainingPlan.findUnique({
@@ -129,7 +157,21 @@ router.post('/generate-plan', authenticate, async (req: AuthRequest, res: Respon
       },
     });
 
-    res.json(completePlan);
+    if (!completePlan) {
+      console.error('Plan was created but could not be retrieved');
+      return res.status(500).json({ 
+        error: 'Failed to retrieve created plan',
+        message: 'Plan was created but could not be retrieved'
+      });
+    }
+
+    res.json({
+      ...completePlan,
+      _meta: {
+        usedFallback,
+        lessonCount: completePlan.lessons.length,
+      }
+    });
   } catch (error) {
     console.error('Generate plan error:', error);
     res.status(500).json({ 

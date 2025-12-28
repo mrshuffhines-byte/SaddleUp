@@ -51,3 +51,4 @@ export interface Session {
   notes?: string;
   horseNotes?: string;
 }
+

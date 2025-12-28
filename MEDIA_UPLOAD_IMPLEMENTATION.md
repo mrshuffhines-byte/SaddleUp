@@ -195,3 +195,4 @@ CLOUDINARY_API_SECRET="your-api-secret"
 8. Test file size limits
 9. Verify thumbnail generation for videos
 10. Test media display in chat messages
+
