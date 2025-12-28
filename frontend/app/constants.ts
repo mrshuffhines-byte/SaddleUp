@@ -1,10 +1,61 @@
-// API URL - uses localhost in development, production URL in production
-// To override, set EXPO_PUBLIC_API_URL environment variable
+/**
+ * API Configuration
+ * 
+ * Chrome Local Network Request Compatibility:
+ * - Development: Uses localhost (HTTP is OK for localhost in development)
+ *   Chrome will prompt users to grant permission for localhost access
+ * - Production: Must use HTTPS with a public domain
+ *   No restrictions apply to public HTTPS endpoints
+ * 
+ * Private IPs (192.168.x.x, 10.x.x.x, .local domains) will require
+ * explicit user permission in Chrome. Always use HTTPS in production.
+ * 
+ * To override, set EXPO_PUBLIC_API_URL environment variable
+ */
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || (
   typeof __DEV__ !== 'undefined' && __DEV__ 
     ? 'http://localhost:3001'
     : 'https://api.thereinapp.com'
 );
+
+/**
+ * Check if the current API URL is a local network address
+ * Chrome will require explicit permission for these in upcoming versions
+ */
+export const isLocalNetworkAPI = (() => {
+  try {
+    const url = new URL(API_URL);
+    const hostname = url.hostname.toLowerCase();
+    
+    // Check for localhost variants
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return true;
+    }
+    
+    // Check for .local domains
+    if (hostname.endsWith('.local')) {
+      return true;
+    }
+    
+    // Check for private IP ranges (IPv4)
+    const parts = hostname.split('.').map(Number);
+    if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+      if (
+        parts[0] === 10 ||
+        (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+        (parts[0] === 192 && parts[1] === 168) ||
+        (parts[0] === 169 && parts[1] === 254)
+      ) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+})();
 
 export const COLORS = {
   primary: '#8B6F47', // Rich brown
