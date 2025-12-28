@@ -4,19 +4,25 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   TextInput,
   Alert,
   ActivityIndicator,
-  Animated,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from './constants';
 import { colors, spacing, typography, borderRadius, shadows } from './theme';
-import { Button, ProgressBar } from '../components/ui';
+import { Button, ProgressBar, ScreenBackground } from '../components/ui';
 import Card from '../components/ui/Card';
 import { Input } from '../components/ui';
 
@@ -59,7 +65,7 @@ const PRIMARY_GOALS = [
   {
     value: 'learn_to_drive',
     label: 'Learn to Drive',
-    icon: '🛞',
+    icon: '🐴🛞', // Better carriage icon representation
     description: 'Carriage/cart driving (not riding) - harness work and ground driving',
   },
   {
@@ -309,15 +315,16 @@ export default function OnboardingScreen() {
   const progress = (step / TOTAL_STEPS) * 100;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <ScreenBackground variant="default">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.content}>
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
@@ -338,38 +345,17 @@ export default function OnboardingScreen() {
               </Text>
 
               <View style={styles.optionsGrid}>
-                {EXPERIENCE_LEVELS.map((level) => (
-                  <TouchableOpacity
-                    key={level.value}
-                    style={[
-                      styles.optionCard,
-                      formData.experienceLevel === level.value && styles.optionCardSelected,
-                    ]}
-                    onPress={() => {
-                      animateSelection();
-                      setFormData({ ...formData, experienceLevel: level.value });
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.optionIcon}>{level.icon}</Text>
-                    <Text
-                      style={[
-                        styles.optionLabel,
-                        formData.experienceLevel === level.value && styles.optionLabelSelected,
-                      ]}
-                    >
-                      {level.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.optionDescription,
-                        formData.experienceLevel === level.value && styles.optionDescriptionSelected,
-                      ]}
-                    >
-                      {level.description}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {EXPERIENCE_LEVELS.map((level) => {
+                  const isSelected = formData.experienceLevel === level.value;
+                  return (
+                    <OptionCard
+                      key={level.value}
+                      option={level}
+                      isSelected={isSelected}
+                      onSelect={() => setFormData({ ...formData, experienceLevel: level.value })}
+                    />
+                  );
+                })}
               </View>
 
               {/* Returning Rider Time Gap Follow-up */}
@@ -422,38 +408,17 @@ export default function OnboardingScreen() {
               </Text>
 
               <View style={styles.optionsGrid}>
-                {PRIMARY_GOALS.map((goal) => (
-                  <TouchableOpacity
-                    key={goal.value}
-                    style={[
-                      styles.optionCard,
-                      formData.primaryGoal === goal.value && styles.optionCardSelected,
-                    ]}
-                    onPress={() => {
-                      animateSelection();
-                      setFormData({ ...formData, primaryGoal: goal.value });
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.optionIcon}>{goal.icon}</Text>
-                    <Text
-                      style={[
-                        styles.optionLabel,
-                        formData.primaryGoal === goal.value && styles.optionLabelSelected,
-                      ]}
-                    >
-                      {goal.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.optionDescription,
-                        formData.primaryGoal === goal.value && styles.optionDescriptionSelected,
-                      ]}
-                    >
-                      {goal.description}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {PRIMARY_GOALS.map((goal) => {
+                  const isSelected = formData.primaryGoal === goal.value;
+                  return (
+                    <OptionCard
+                      key={goal.value}
+                      option={goal}
+                      isSelected={isSelected}
+                      onSelect={() => setFormData({ ...formData, primaryGoal: goal.value })}
+                    />
+                  );
+                })}
               </View>
             </View>
           )}
@@ -750,13 +715,86 @@ export default function OnboardingScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenBackground>
+  );
+}
+
+// Option Card Component with Animations
+function OptionCard({ 
+  option, 
+  isSelected, 
+  onSelect 
+}: { 
+  option: { value: string; label: string; icon: string; description: string }; 
+  isSelected: boolean; 
+  onSelect: () => void;
+}) {
+  const scale = useSharedValue(1);
+  const backgroundColor = useSharedValue(isSelected ? 1 : 0);
+
+  useEffect(() => {
+    backgroundColor.value = withTiming(isSelected ? 1 : 0, { duration: 200 });
+  }, [isSelected]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const bgColor = interpolateColor(
+      backgroundColor.value,
+      [0, 1],
+      ['#fafaf9', colors.primary[500]]
+    );
+
+    return {
+      transform: [{ scale: scale.value }],
+      backgroundColor: bgColor,
+      borderColor: backgroundColor.value === 1 ? colors.primary[600] : colors.neutral[200],
+    };
+  });
+
+  const textColorStyle = useAnimatedStyle(() => ({
+    color: backgroundColor.value === 1 ? '#fafaf9' : colors.neutral[900],
+  }));
+
+  const descColorStyle = useAnimatedStyle(() => ({
+    color: backgroundColor.value === 1 ? colors.primary[100] : colors.neutral[600],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
+
+  return (
+    <Pressable
+      onPress={onSelect}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <Animated.View style={[styles.optionCard, animatedStyle]}>
+        <View style={styles.iconContainer}>
+          <Text style={styles.optionIcon}>{option.icon}</Text>
+        </View>
+        <Animated.Text style={[styles.optionLabel, textColorStyle]}>
+          {option.label}
+        </Animated.Text>
+        <Animated.Text style={[styles.optionDescription, descColorStyle]}>
+          {option.description}
+        </Animated.Text>
+        {isSelected && (
+          <View style={styles.checkmark}>
+            <Text style={styles.checkmarkText}>✓</Text>
+          </View>
+        )}
+      </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.neutral[50],
   },
   scrollView: {
     flex: 1,
@@ -809,38 +847,50 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   optionCard: {
-    backgroundColor: colors.neutral[50],
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     borderWidth: 2,
-    borderColor: colors.neutral[200],
     alignItems: 'center',
     ...shadows.sm,
   },
-  optionCardSelected: {
-    backgroundColor: colors.primary[500],
-    borderColor: colors.primary[600],
-    ...shadows.md,
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   optionIcon: {
-    fontSize: 48,
-    marginBottom: spacing.sm,
+    fontSize: 32,
   },
   optionLabel: {
     ...typography.h4,
-    color: colors.neutral[900],
     marginBottom: spacing.xs,
-  },
-  optionLabelSelected: {
-    color: colors.neutral[50],
+    fontWeight: typography.weights.semibold,
   },
   optionDescription: {
     ...typography.bodySmall,
-    color: colors.neutral[600],
     textAlign: 'center',
+    lineHeight: typography.bodySmall.lineHeight,
   },
-  optionDescriptionSelected: {
-    color: colors.neutral[100],
+  checkmark: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  checkmarkText: {
+    color: colors.primary[500],
+    fontWeight: typography.weights.bold,
+    fontSize: 18,
   },
   timeCard: {
     padding: spacing.lg,
