@@ -121,10 +121,13 @@ export default function ChatScreen() {
     }
   };
 
-  const createNewConversation = async () => {
+  const createNewConversation = async (initialMessage?: string) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      if (!token) return;
+      if (!token) {
+        router.replace('/(auth)/login');
+        return;
+      }
 
       const response = await fetch(`${API_URL}/api/conversations`, {
         method: 'POST',
@@ -141,17 +144,26 @@ export default function ChatScreen() {
 
       const data = await response.json();
       setCurrentConversation(data);
-      loadConversations();
+      await loadConversations();
+      
+      // If there's an initial message, send it
+      if (initialMessage && initialMessage.trim()) {
+        setMessage(initialMessage.trim());
+        // Send the message after a brief delay to ensure conversation is set
+        setTimeout(() => {
+          sendMessageWithConversation(data.id, initialMessage.trim());
+        }, 100);
+      }
+      
+      return data;
     } catch (error) {
       console.error('Create conversation error:', error);
       Alert.alert('Error', 'Failed to create conversation');
+      throw error;
     }
   };
 
-  const sendMessage = async () => {
-    if (!message.trim() || !currentConversation) return;
-
-    const messageText = message;
+  const sendMessageWithConversation = async (conversationId: string, messageText: string) => {
     setMessage('');
     setLoading(true);
     setIsTyping(true);
@@ -167,7 +179,70 @@ export default function ChatScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          conversationId: currentConversation.id,
+          conversationId,
+          content: messageText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      // Reload conversation to get updated messages
+      await loadConversation(conversationId);
+      await loadConversations();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send message');
+    } finally {
+      setLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    const messageText = message.trim();
+    setMessage('');
+    setLoading(true);
+    setIsTyping(true);
+
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      // Create conversation if it doesn't exist
+      let conversation = currentConversation;
+      if (!conversation) {
+        const createResponse = await fetch(`${API_URL}/api/conversations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        });
+
+        if (!createResponse.ok) {
+          throw new Error('Failed to create conversation');
+        }
+
+        conversation = await createResponse.json();
+        setCurrentConversation(conversation);
+      }
+
+      // Send the message
+      const response = await fetch(`${API_URL}/api/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          conversationId: conversation.id,
           content: messageText,
         }),
       });
@@ -179,10 +254,11 @@ export default function ChatScreen() {
       const data = await response.json();
       
       // Reload conversation to get updated messages
-      await loadConversation(currentConversation.id);
+      await loadConversation(conversation.id);
       await loadConversations();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send message');
+      setMessage(messageText); // Restore message on error
     } finally {
       setLoading(false);
       setIsTyping(false);
@@ -367,7 +443,11 @@ export default function ChatScreen() {
 
   if (!currentConversation || messages.length === 0) {
     return (
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+        keyboardVerticalOffset={90}
+      >
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.welcomeContainer}
@@ -396,8 +476,8 @@ export default function ChatScreen() {
                     key={index}
                     text={question}
                     onPress={() => {
-                      createNewConversation().then(() => {
-                        setMessage(question);
+                      createNewConversation(question).catch(err => {
+                        console.error('Failed to create conversation:', err);
                       });
                     }}
                   />
@@ -414,7 +494,47 @@ export default function ChatScreen() {
             </View>
           </View>
         </ScrollView>
-      </View>
+
+        {/* Input bar at bottom even when no conversation */}
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.mediaButton}
+            onPress={showMediaOptions}
+            disabled={loading || uploadingMedia}
+          >
+            {uploadingMedia ? (
+              <ActivityIndicator color={colors.primary[500]} size="small" />
+            ) : (
+              <Text style={styles.mediaButtonText}>📷</Text>
+            )}
+          </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            placeholder="Ask a question..."
+            placeholderTextColor={colors.neutral[400]}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            editable={!loading}
+            onSubmitEditing={sendMessage}
+            returnKeyType="send"
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!message.trim() && !selectedMedia) || loading ? styles.sendButtonDisabled : null,
+            ]}
+            onPress={sendMessage}
+            disabled={(!message.trim() && !selectedMedia) || loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.surface} size="small" />
+            ) : (
+              <Text style={styles.sendButtonText}>Send</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     );
   }
 
