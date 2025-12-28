@@ -767,7 +767,7 @@ export default function OnboardingScreen() {
                       formData.methodPreference === 'blend' && styles.preferenceOptionSelected,
                     ]}
                     onPress={() => {
-                      setFormData({ ...formData, methodPreference: 'blend' });
+                      setFormData({ ...formData, methodPreference: 'blend', selectedMethods: [] });
                     }}
                     activeOpacity={0.7}
                   >
@@ -786,7 +786,7 @@ export default function OnboardingScreen() {
                       formData.methodPreference === 'single' && styles.preferenceOptionSelected,
                     ]}
                     onPress={() => {
-                      setFormData({ ...formData, methodPreference: 'single' });
+                      setFormData({ ...formData, methodPreference: 'single', selectedMethods: [] });
                     }}
                     activeOpacity={0.7}
                   >
@@ -826,9 +826,11 @@ export default function OnboardingScreen() {
                           <View style={styles.methodGrid}>
                             {categoryMethods.map((method: any) => {
                               const isSelected = formData.selectedMethods.includes(method.id);
+                              // For 'blend', allow selection if less than 4 methods are selected
+                              // For 'single', allow selection if no methods are selected (or if this one is already selected)
                               const canSelect = formData.methodPreference === 'blend' 
                                 ? formData.selectedMethods.length < 4 
-                                : formData.selectedMethods.length === 0;
+                                : formData.selectedMethods.length === 0 || isSelected;
                               
                               return (
                                 <TouchableOpacity
@@ -840,18 +842,24 @@ export default function OnboardingScreen() {
                                   ]}
                                   onPress={() => {
                                     if (formData.methodPreference === 'single') {
+                                      // For single method, replace current selection with this one
                                       setFormData({ ...formData, selectedMethods: [method.id] });
                                     } else {
+                                      // For blend, toggle selection
                                       if (isSelected) {
+                                        // Deselect
                                         setFormData({ 
                                           ...formData, 
                                           selectedMethods: formData.selectedMethods.filter(id => id !== method.id) 
                                         });
-                                      } else if (canSelect) {
-                                        setFormData({ 
-                                          ...formData, 
-                                          selectedMethods: [...formData.selectedMethods, method.id] 
-                                        });
+                                      } else {
+                                        // Select (we already checked canSelect, but add another check just in case)
+                                        if (formData.selectedMethods.length < 4) {
+                                          setFormData({ 
+                                            ...formData, 
+                                            selectedMethods: [...formData.selectedMethods, method.id] 
+                                          });
+                                        }
                                       }
                                     }
                                   }}
