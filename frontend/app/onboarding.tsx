@@ -1050,9 +1050,9 @@ export default function OnboardingScreen() {
             )}
             {(() => {
               // Check if we're on the final step
-              // If user owns horse: final step is 6 (TOTAL_STEPS)
-              // If user doesn't own horse: final step is 6 (step 5 is skipped)
-              const isFinalStep = step === 6 || (step === TOTAL_STEPS);
+              // Use the same condition as the method selection step render
+              // Method selection is shown when: step === 6 OR (step === 5 && !ownsHorse)
+              const isFinalStep = step === 6 || (step === 5 && !formData.ownsHorse);
               
               return !isFinalStep ? (
                 <Button
