@@ -196,11 +196,30 @@ export function buildAIContextPrompt(context: ComprehensiveContext): string {
     if (context.horse.age) prompt += `Age: ${context.horse.age}\n`;
     if (context.horse.sex) prompt += `Sex: ${context.horse.sex}\n`;
     if (context.horse.temperament) {
-      prompt += `Temperament: ${JSON.stringify(context.horse.temperament)}\n`;
+      const temp = Array.isArray(context.horse.temperament) 
+        ? context.horse.temperament.join(', ') 
+        : String(context.horse.temperament);
+      prompt += `Temperament: ${temp}\n`;
+      
+      // Add safety warning for unpredictable horses
+      const tempStr = temp.toLowerCase();
+      if (tempStr.includes('unpredictable')) {
+        prompt += `⚠️ **CRITICAL SAFETY WARNING: This horse is unpredictable. Always emphasize safety, recommend professional supervision for any hands-on work, and suggest starting with very basic, low-risk exercises.**\n`;
+      }
     }
     if (context.horse.energyLevel) prompt += `Energy Level: ${context.horse.energyLevel}\n`;
     if (context.horse.learningStyle) {
       prompt += `Learning Style: ${JSON.stringify(context.horse.learningStyle)}\n`;
+    }
+    if (context.horse.trainingLevel) {
+      prompt += `Training Level: ${context.horse.trainingLevel}\n`;
+    }
+    if (context.horse.isProfessionallyTrained !== undefined && context.horse.isProfessionallyTrained !== null) {
+      prompt += `Professionally Trained: ${context.horse.isProfessionallyTrained ? 'Yes' : 'No'}\n`;
+    }
+    if (context.horse.knownIssues && Array.isArray(context.horse.knownIssues) && context.horse.knownIssues.length > 0) {
+      prompt += `Known Issues: ${context.horse.knownIssues.join(', ')}\n`;
+      prompt += `**IMPORTANT: This horse has behavioral issues. Provide specific, safe strategies for working with these challenges.**\n`;
     }
     if (context.horse.injuries && Array.isArray(context.horse.injuries) && context.horse.injuries.length > 0) {
       prompt += `Injuries/Health: ${JSON.stringify(context.horse.injuries)}\n`;
@@ -232,6 +251,12 @@ export function buildAIContextPrompt(context: ComprehensiveContext): string {
   if (context.rider.profile) {
     prompt += `\n**RIDER PROFILE:**\n`;
     prompt += `Experience Level: ${context.rider.profile.experienceLevel}\n`;
+    if (context.rider.profile.returningTimeGap) {
+      prompt += `Time away from horses: ${context.rider.profile.returningTimeGap} years\n`;
+    }
+    if (context.rider.profile.horseAccess && !context.rider.profile.ownsHorse) {
+      prompt += `Horse Access: ${context.rider.profile.horseAccess}\n`;
+    }
     if (context.rider.learningStyle) {
       prompt += `Learning Style: ${context.rider.learningStyle}\n`;
     }

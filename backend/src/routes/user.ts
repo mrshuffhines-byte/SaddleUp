@@ -12,6 +12,8 @@ const onboardingSchema = z.object({
   sessionLength: z.number().int().min(15),
   ownsHorse: z.boolean(),
   horseDetails: z.string().optional(),
+  returningTimeGap: z.enum(['1-2', '3-5', '5-10', '10-20', '20+']).optional(),
+  horseAccess: z.enum(['lease', 'lessons', 'planning', 'other']).optional(),
 });
 
 // Get current user
@@ -69,14 +71,26 @@ router.post('/profile', authenticate, async (req: AuthRequest, res: Response) =>
     const profile = await prisma.userProfile.upsert({
       where: { userId: req.userId! },
       update: {
-        ...data,
+        experienceLevel: data.experienceLevel,
+        primaryGoal: data.primaryGoal,
+        daysPerWeek: data.daysPerWeek,
+        sessionLength: data.sessionLength,
+        ownsHorse: data.ownsHorse,
         horseDetails: data.horseDetails || null,
+        returningTimeGap: data.returningTimeGap || null,
+        horseAccess: data.horseAccess || null,
         updatedAt: new Date(),
       },
       create: {
         userId: req.userId!,
-        ...data,
+        experienceLevel: data.experienceLevel,
+        primaryGoal: data.primaryGoal,
+        daysPerWeek: data.daysPerWeek,
+        sessionLength: data.sessionLength,
+        ownsHorse: data.ownsHorse,
         horseDetails: data.horseDetails || null,
+        returningTimeGap: data.returningTimeGap || null,
+        horseAccess: data.horseAccess || null,
       },
     });
 

@@ -10,17 +10,20 @@ const router = express.Router();
 const createHorseSchema = z.object({
   name: z.string().min(1),
   breed: z.string().optional(),
-  age: z.string().optional(),
+  age: z.string().optional(), // Under 5, 5-10, 11-17, 18+
   sex: z.string().optional(),
   height: z.string().optional(),
   weight: z.number().optional(),
-  temperament: z.array(z.string()).optional(),
+  temperament: z.union([z.string(), z.array(z.string())]).optional(), // Can be single value or array
   energyLevel: z.enum(['high', 'medium', 'low']).optional(),
   learningStyle: z.array(z.string()).optional(),
   primaryUse: z.array(z.string()).optional(),
+  trainingLevel: z.enum(['untrained', 'green', 'trained', 'well-trained']).optional(),
+  isProfessionallyTrained: z.boolean().nullable().optional(),
   trainingHistory: z.array(z.any()).optional(),
   knownCues: z.array(z.any()).optional(),
-  injuries: z.array(z.any()).optional(),
+  knownIssues: z.array(z.string()).optional(), // biting, kicking, rearing, bolting, etc.
+  injuries: z.array(z.any().optional()).optional(),
   healthConditions: z.array(z.string()).optional(),
   pastTrauma: z.array(z.string()).optional(),
   goodWith: z.array(z.string()).optional(),
@@ -134,23 +137,44 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Horse not found' });
     }
 
-    const updated = await prisma.horse.update({
-      where: { id: req.params.id },
-      data: {
-        ...data,
-        // Convert arrays to JSON for Prisma (use undefined instead of null)
-        temperament: data.temperament !== undefined ? (data.temperament || undefined) : undefined,
-        learningStyle: data.learningStyle !== undefined ? (data.learningStyle || undefined) : undefined,
-        primaryUse: data.primaryUse !== undefined ? (data.primaryUse || undefined) : undefined,
-        trainingHistory: data.trainingHistory !== undefined ? (data.trainingHistory || undefined) : undefined,
-        knownCues: data.knownCues !== undefined ? (data.knownCues || undefined) : undefined,
-        injuries: data.injuries !== undefined ? (data.injuries || undefined) : undefined,
-        healthConditions: data.healthConditions !== undefined ? (data.healthConditions || undefined) : undefined,
-        pastTrauma: data.pastTrauma !== undefined ? (data.pastTrauma || undefined) : undefined,
-        goodWith: data.goodWith !== undefined ? (data.goodWith || undefined) : undefined,
-        struggles: data.struggles !== undefined ? (data.struggles || undefined) : undefined,
-      },
-    });
+            // Normalize temperament if provided
+            let temperamentValue: any = undefined;
+            if (data.temperament !== undefined) {
+              if (typeof data.temperament === 'string') {
+                temperamentValue = [data.temperament];
+              } else if (Array.isArray(data.temperament)) {
+                temperamentValue = data.temperament;
+              } else {
+                temperamentValue = undefined;
+              }
+            }
+
+            const updated = await prisma.horse.update({
+              where: { id: req.params.id },
+              data: {
+                name: data.name,
+                breed: data.breed,
+                age: data.age,
+                sex: data.sex,
+                height: data.height,
+                weight: data.weight,
+                temperament: temperamentValue !== undefined ? temperamentValue : undefined,
+                energyLevel: data.energyLevel,
+                learningStyle: data.learningStyle !== undefined ? (data.learningStyle || undefined) : undefined,
+                primaryUse: data.primaryUse !== undefined ? (data.primaryUse || undefined) : undefined,
+                trainingLevel: data.trainingLevel,
+                isProfessionallyTrained: data.isProfessionallyTrained !== undefined ? (data.isProfessionallyTrained ?? undefined) : undefined,
+                trainingHistory: data.trainingHistory !== undefined ? (data.trainingHistory || undefined) : undefined,
+                knownCues: data.knownCues !== undefined ? (data.knownCues || undefined) : undefined,
+                knownIssues: data.knownIssues !== undefined ? (data.knownIssues || undefined) : undefined,
+                injuries: data.injuries !== undefined ? (data.injuries || undefined) : undefined,
+                healthConditions: data.healthConditions !== undefined ? (data.healthConditions || undefined) : undefined,
+                pastTrauma: data.pastTrauma !== undefined ? (data.pastTrauma || undefined) : undefined,
+                goodWith: data.goodWith !== undefined ? (data.goodWith || undefined) : undefined,
+                struggles: data.struggles !== undefined ? (data.struggles || undefined) : undefined,
+                notes: data.notes,
+              },
+            });
 
     res.json(updated);
   } catch (error) {

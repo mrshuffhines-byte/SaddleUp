@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  directUrl = env("DIRECT_URL") // Optional: defaults to DATABASE_URL if not set
 }
 
 model User {
@@ -39,8 +39,10 @@ model UserProfile {
   sessionLength   Int // in minutes
   ownsHorse       Boolean
   horseDetails    String?
+  returningTimeGap String? // 1-2, 3-5, 5-10, 10-20, 20+ (years since riding regularly)
+  horseAccess     String? // lease, lessons, planning, other (if doesn't own horse)
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt          DateTime @updatedAt
 }
 
 model TrainingPlan {
@@ -211,35 +213,38 @@ model SavedAnswer {
 }
 
 model Horse {
-  id               String      @id @default(cuid())
-  visibleId        String      @unique
-  visibleIdDisplay String
-  userId           String
-  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name             String
-  breed            String?
-  age              String? // foal, yearling, 2-3yo, 4-10yo, 11-17yo, 18+ senior
-  sex              String? // mare, gelding, stallion
-  height           String? // e.g., "15.2 hands"
-  weight           Int? // in pounds
-  temperament      Json? // Array of tags: hot/sensitive, steady/calm, lazy/dull, etc.
-  energyLevel      String? // high, medium, low
-  learningStyle    Json? // Array of: quick learner, needs repetition, easily frustrated, etc.
-  primaryUse       Json? // Array of: trail, arena, driving, ranch work, therapy, companion
-  trainingHistory  Json? // Array of {method, worked, notWorked}
-  knownCues        Json? // Array of {cue, method}
-  injuries         Json? // Array of {type, location, date, status, limitations}
-  healthConditions Json? // Array of conditions: arthritis, navicular, COPD, etc.
-  pastTrauma       Json? // Array of known traumatic experiences
-  goodWith         Json? // Array of things horse handles well
-  struggles        Json? // Array of things horse finds difficult
-  notes            String?
-  isActive         Boolean     @default(true)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  sessions         Session[]
-  lessons          Lesson[]
-  planHorses       PlanHorse[]
+  id                    String      @id @default(cuid())
+  visibleId             String      @unique
+  visibleIdDisplay      String
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                  String
+  breed                 String?
+  age                   String? // Under 5, 5-10, 11-17, 18+
+  sex                   String? // mare, gelding, stallion
+  height                String? // e.g., "15.2 hands"
+  weight                Int? // in pounds
+  temperament           Json? // Array or single value: calm, nervous, energetic, stubborn, unpredictable
+  energyLevel           String? // high, medium, low
+  learningStyle         Json? // Array of: quick learner, needs repetition, easily frustrated, etc.
+  primaryUse            Json? // Array of: trail, arena, driving, ranch work, therapy, companion
+  trainingLevel         String? // untrained, green, trained, well-trained
+  isProfessionallyTrained Boolean? // true if professionally trained, false if not, null if unknown
+  trainingHistory       Json? // Array of {method, worked, notWorked}
+  knownCues             Json? // Array of {cue, method}
+  knownIssues           Json? // Array of issues: biting, kicking, rearing, bolting, won't stand still, hard to catch, pulls on lead
+  injuries              Json? // Array of {type, location, date, status, limitations}
+  healthConditions      Json? // Array of conditions: arthritis, navicular, COPD, etc.
+  pastTrauma            Json? // Array of known traumatic experiences
+  goodWith              Json? // Array of things horse handles well
+  struggles             Json? // Array of things horse finds difficult
+  notes                 String?
+  isActive              Boolean     @default(true)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  sessions              Session[]
+  lessons               Lesson[]
+  planHorses            PlanHorse[]
 }
 
 model PlanHorse {
