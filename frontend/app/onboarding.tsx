@@ -1618,6 +1618,22 @@ const styles = StyleSheet.create({
   loadingSpinner: {
     padding: spacing.xl,
   },
+  emptyMethodsContainer: {
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    fontWeight: '600',
+  },
+  errorSubtext: {
+    ...typography.bodySmall,
+    color: colors.neutral[600],
+    textAlign: 'center',
+  },
   safetyNote: {
     ...typography.bodySmall,
     color: colors.warning,
