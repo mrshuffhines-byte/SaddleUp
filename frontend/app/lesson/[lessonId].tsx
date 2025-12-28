@@ -16,7 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../constants';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import Card from '../../components/ui/Card';
-import { Button } from '../../components/ui';
+import { Button, TooltipText } from '../../components/ui';
+import { SafetyChecklist } from '../../components/SafetyChecklist';
 
 interface Lesson {
   id: string;
@@ -48,14 +49,19 @@ export default function LessonScreen() {
   const [loading, setLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showSafetyChecklist, setShowSafetyChecklist] = useState(false);
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
+  const [troubleSteps, setTroubleSteps] = useState<Set<number>>(new Set());
   const [expandedTips, setExpandedTips] = useState<Set<number>>(new Set());
+  const [completedLessonsCount, setCompletedLessonsCount] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
     if (lessonId) {
       loadLesson();
       loadInstructionProgress();
+      loadTroubleSteps();
     }
   }, [lessonId]);
 
@@ -108,6 +114,22 @@ export default function LessonScreen() {
           if (currentIndex >= 0 && currentIndex < sortedLessons.length - 1) {
             setNextLesson(sortedLessons[currentIndex + 1]);
           }
+
+          // Count completed lessons
+          const completed = sortedLessons.filter(l => l.isCompleted).length;
+          setCompletedLessonsCount(completed);
+        }
+      }
+
+      // Load streak from sessions
+      const sessionsResponse = await fetch(`${API_URL}/api/sessions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (sessionsResponse.ok) {
+        const sessions = await sessionsResponse.json();
+        if (Array.isArray(sessions)) {
+          const streak = calculateStreak(sessions);
+          setCurrentStreak(streak);
         }
       }
     } catch (error) {
@@ -164,7 +186,69 @@ export default function LessonScreen() {
     setExpandedTips(newExpanded);
   };
 
-  const handleMarkComplete = async () => {
+  const markTrouble = (index: number) => {
+    const newTrouble = new Set(troubleSteps);
+    if (newTrouble.has(index)) {
+      newTrouble.delete(index);
+    } else {
+      newTrouble.add(index);
+    }
+    setTroubleSteps(newTrouble);
+    // Save to AsyncStorage
+    const key = `lesson_trouble_${lessonId}`;
+    AsyncStorage.setItem(key, JSON.stringify({ troubleSteps: Array.from(newTrouble) }));
+  };
+
+  const calculateStreak = (sessions: any[]): number => {
+    if (sessions.length === 0) return 0;
+
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const sortedSessions = [...sessions].sort((a, b) =>
+      new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()
+    );
+
+    let checkDate = new Date(today);
+    
+    for (const session of sortedSessions) {
+      const sessionDate = new Date(session.sessionDate);
+      sessionDate.setHours(0, 0, 0, 0);
+
+      if (sessionDate.getTime() === checkDate.getTime()) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else if (sessionDate.getTime() < checkDate.getTime()) {
+        break;
+      }
+    }
+
+    return streak;
+  };
+
+  const loadTroubleSteps = async () => {
+    try {
+      const key = `lesson_trouble_${lessonId}`;
+      const saved = await AsyncStorage.getItem(key);
+      if (saved) {
+        const data = JSON.parse(saved);
+        setTroubleSteps(new Set(data.troubleSteps || []));
+      }
+    } catch (error) {
+      console.error('Load trouble steps error:', error);
+    }
+  };
+
+  const handleMarkComplete = () => {
+    // Show safety checklist first (for beginner lessons)
+    const isBeginner = true; // Could be determined from user profile
+    setShowSafetyChecklist(true);
+  };
+
+  const handleSafetyChecklistComplete = async () => {
+    setShowSafetyChecklist(false);
+    
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
@@ -186,6 +270,7 @@ export default function LessonScreen() {
       }
 
       setIsCompleted(true);
+      setCompletedLessonsCount(prev => prev + 1);
       setShowSuccess(true);
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -262,57 +347,153 @@ export default function LessonScreen() {
                 By the end of this lesson, you'll be able to:
               </Text>
               {objectives.map((obj: string, index: number) => (
-                <Text key={index} style={styles.bulletPoint}>
-                  • {obj}
-                </Text>
+                <View key={index} style={styles.objectiveItem}>
+                  <Text style={styles.bullet}>•</Text>
+                  <View style={styles.objectiveTextContainer}>
+                    <TooltipText>{obj}</TooltipText>
+                  </View>
+                </View>
               ))}
             </Card>
           )}
 
           {/* Equipment */}
           {content?.equipment && content.equipment.length > 0 && (
-            <Card style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>🛠 Equipment Needed</Text>
+            <Card style={styles.equipmentCard}>
+              <Text style={styles.sectionTitle}>🧰 What You'll Need</Text>
               {content.equipment.map((item: string, index: number) => (
-                <Text key={index} style={styles.bulletPoint}>
-                  • {item}
-                </Text>
+                <View key={index} style={styles.equipmentItem}>
+                  <Text style={styles.equipmentCheck}>✓</Text>
+                  <View style={styles.equipmentTextContainer}>
+                    <TooltipText>{item}</TooltipText>
+                  </View>
+                </View>
               ))}
             </Card>
           )}
 
           {/* Interactive Instructions */}
           {content?.instructions && content.instructions.length > 0 && (
-            <Card style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>📋 Step-by-Step Instructions</Text>
-              {content.instructions.map((instruction: string, index: number) => {
+            <Card style={styles.instructionsCard}>
+              <Text style={styles.sectionTitle}>📋 Instructions</Text>
+              {content.instructions.map((instruction: any, index: number) => {
                 const isChecked = checkedSteps.has(index);
+                const hasTrouble = troubleSteps.has(index);
+                const instructionText = typeof instruction === 'string' ? instruction : instruction.text;
+                const instructionTip = typeof instruction === 'object' ? instruction.tip : undefined;
+                const instructionWarning = typeof instruction === 'object' ? instruction.warning : undefined;
+                const successLooksLike = typeof instruction === 'object' ? instruction.successLooksLike : undefined;
+                const isTipExpanded = expandedTips.has(index);
+
                 return (
-                  <Pressable
-                    key={index}
+                  <View 
+                    key={index} 
                     style={[
                       styles.instructionStep,
-                      isChecked && styles.instructionStepChecked,
+                      isChecked && styles.stepCompleted,
+                      hasTrouble && styles.stepTrouble,
                     ]}
-                    onPress={() => toggleStep(index)}
                   >
-                    <View style={styles.checkbox}>
-                      {isChecked && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                    <View style={styles.instructionContent}>
-                      <Text
-                        style={[
-                          styles.instructionText,
-                          isChecked && styles.instructionTextChecked,
-                        ]}
-                      >
-                        {instruction}
+                    <Pressable 
+                      style={styles.stepCheckbox}
+                      onPress={() => toggleStep(index)}
+                    >
+                      <Text style={styles.stepNumber}>
+                        {isChecked ? '✓' : index + 1}
                       </Text>
-                      {/* Tip expansion could go here if we add tips to instructions */}
+                    </Pressable>
+                    
+                    <View style={styles.stepContent}>
+                      <TooltipText>{instructionText}</TooltipText>
+                      
+                      {instructionTip && (
+                        <TouchableOpacity
+                          style={styles.stepTip}
+                          onPress={() => toggleTip(index)}
+                        >
+                          <Text style={styles.tipIcon}>💡</Text>
+                          <Text style={styles.tipButtonText}>
+                            {isTipExpanded ? 'Hide Tip' : 'Show Tip'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {instructionTip && isTipExpanded && (
+                        <Text style={styles.tipText}>{instructionTip}</Text>
+                      )}
+                      
+                      {instructionWarning && (
+                        <View style={styles.stepWarning}>
+                          <Text style={styles.warningIcon}>⚠️</Text>
+                          <Text style={styles.warningText}>{instructionWarning}</Text>
+                        </View>
+                      )}
+                      
+                      {successLooksLike && (
+                        <View style={styles.successHint}>
+                          <Text style={styles.successIcon}>👀</Text>
+                          <Text style={styles.successText}>
+                            <Text style={styles.successLabel}>Success looks like: </Text>
+                            {successLooksLike}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      <View style={styles.stepActions}>
+                        <TouchableOpacity 
+                          style={styles.doneButton}
+                          onPress={() => toggleStep(index)}
+                        >
+                          <Text style={styles.doneButtonText}>
+                            {isChecked ? 'Undo' : 'Done'}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                          style={[
+                            styles.troubleButton, 
+                            hasTrouble && styles.troubleButtonActive
+                          ]}
+                          onPress={() => markTrouble(index)}
+                        >
+                          <Text style={styles.troubleButtonText}>
+                            {hasTrouble ? 'Had Trouble ❌' : 'Had Trouble?'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </Pressable>
+                  </View>
                 );
               })}
+            </Card>
+          )}
+
+          {/* Trouble Help Section */}
+          {troubleSteps.size > 0 && (
+            <Card style={styles.troubleHelp}>
+              <Text style={styles.troubleHelpTitle}>Having trouble with some steps?</Text>
+              <Text style={styles.troubleHelpText}>
+                That's completely normal! Try asking the trainer for help with specific steps.
+              </Text>
+              <Button
+                title="Ask the Trainer for Help"
+                onPress={() => {
+                  const troubleStepTexts = Array.from(troubleSteps)
+                    .map(i => {
+                      const inst = content?.instructions?.[i];
+                      const text = typeof inst === 'string' ? inst : inst?.text || '';
+                      return text.substring(0, 50); // Limit length
+                    })
+                    .filter(Boolean)
+                    .slice(0, 3)
+                    .join(', ');
+                  // Navigate to chat - the chat screen will need to handle the prefill
+                  router.push('/(tabs)/chat');
+                  // Note: In a real implementation, you might want to use a global state
+                  // or query params to prefill the chat input
+                }}
+                style={styles.askTrainerButton}
+                fullWidth
+              />
             </Card>
           )}
 
@@ -330,12 +511,15 @@ export default function LessonScreen() {
 
           {/* Common Mistakes */}
           {content?.commonMistakes && content.commonMistakes.length > 0 && (
-            <Card style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>💡 Common Mistakes to Avoid</Text>
+            <Card style={styles.mistakesCard}>
+              <Text style={styles.sectionTitle}>❌ Common Mistakes to Avoid</Text>
               {content.commonMistakes.map((mistake: string, index: number) => (
-                <Text key={index} style={styles.bulletPoint}>
-                  • {mistake}
-                </Text>
+                <View key={index} style={styles.mistakeItem}>
+                  <Text style={styles.mistakeBullet}>•</Text>
+                  <View style={styles.mistakeTextContainer}>
+                    <TooltipText>{mistake}</TooltipText>
+                  </View>
+                </View>
               ))}
             </Card>
           )}
@@ -373,17 +557,28 @@ export default function LessonScreen() {
             <Card style={styles.nextUpCard}>
               <Text style={styles.nextUpLabel}>Up Next</Text>
               <Text style={styles.nextUpTitle}>{nextLesson.title}</Text>
+              <Text style={styles.nextUpMeta}>
+                Phase {nextLesson.phaseNumber} • ~{duration} min
+              </Text>
               <Button
-                title="Start Next Lesson →"
+                title="Preview Next Lesson"
                 onPress={() => router.push(`/lesson/${nextLesson.lessonId}`)}
                 variant="outline"
-                style={styles.nextButton}
+                style={styles.previewButton}
                 fullWidth
               />
             </Card>
           )}
         </View>
       </ScrollView>
+
+      {/* Safety Checklist Modal */}
+      <SafetyChecklist
+        visible={showSafetyChecklist}
+        onComplete={handleSafetyChecklistComplete}
+        onCancel={() => setShowSafetyChecklist(false)}
+        isBeginnerLesson={true}
+      />
 
       {/* Success Modal */}
       <Modal
@@ -396,9 +591,30 @@ export default function LessonScreen() {
           <Card style={styles.successModal}>
             <Text style={styles.successEmoji}>🎉</Text>
             <Text style={styles.successTitle}>Lesson Complete!</Text>
-            <Text style={styles.successText}>
-              Great job! You're making progress.
+            <Text style={styles.successMessage}>
+              Great job! You're making real progress on your horsemanship journey.
             </Text>
+            
+            {troubleSteps.size > 0 && (
+              <View style={styles.reviewNote}>
+                <Text style={styles.reviewNoteText}>
+                  You marked {troubleSteps.size} step(s) as tricky. 
+                  Consider practicing these again next session.
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.successStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{completedLessonsCount}</Text>
+                <Text style={styles.statLabel}>Lessons Done</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{currentStreak}</Text>
+                <Text style={styles.statLabel}>Day Streak</Text>
+              </View>
+            </View>
+            
             <View style={styles.successButtons}>
               {nextLesson ? (
                 <Button
@@ -409,19 +625,21 @@ export default function LessonScreen() {
                 />
               ) : (
                 <Button
-                  title="View Training Plan"
+                  title="Back to Training Plan"
                   onPress={goToPlan}
                   style={styles.successButton}
                   fullWidth
                 />
               )}
-              <Button
-                title="Back to Plan"
-                onPress={goToPlan}
-                variant="outline"
-                style={styles.successButton}
-                fullWidth
-              />
+              {nextLesson && (
+                <Button
+                  title="Back to Training Plan"
+                  onPress={goToPlan}
+                  variant="outline"
+                  style={styles.successButton}
+                  fullWidth
+                />
+              )}
             </View>
           </Card>
         </View>
@@ -485,6 +703,41 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     backgroundColor: colors.primary[50],
   },
+  objectiveItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  bullet: {
+    ...typography.body,
+    color: colors.primary[700],
+    marginRight: spacing.sm,
+    marginTop: 2,
+  },
+  objectiveTextContainer: {
+    flex: 1,
+  },
+  equipmentCard: {
+    marginBottom: spacing.lg,
+  },
+  equipmentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  equipmentCheck: {
+    ...typography.body,
+    color: colors.success,
+    marginRight: spacing.sm,
+    marginTop: 2,
+    fontWeight: typography.weights.bold,
+  },
+  equipmentTextContainer: {
+    flex: 1,
+  },
+  instructionsCard: {
+    marginBottom: spacing.lg,
+  },
   sectionCard: {
     marginBottom: spacing.lg,
   },
@@ -516,37 +769,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.md,
     backgroundColor: colors.neutral[50],
-  },
-  instructionStepChecked: {
-    backgroundColor: colors.success + '20',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: borderRadius.sm,
-    borderWidth: 2,
-    borderColor: colors.primary[500],
-    marginRight: spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  checkmark: {
-    fontSize: typography.bodySmall.fontSize,
-    color: colors.primary[500],
-    fontWeight: '700',
-  },
-  instructionContent: {
-    flex: 1,
-  },
-  instructionText: {
-    ...typography.body,
-    color: colors.neutral[900],
-    lineHeight: typography.body.lineHeight,
-  },
-  instructionTextChecked: {
-    textDecorationLine: 'line-through',
-    color: colors.neutral[500],
   },
   safetyPoint: {
     ...typography.body,
@@ -587,7 +809,13 @@ const styles = StyleSheet.create({
     color: colors.neutral[900],
     marginBottom: spacing.md,
   },
-  nextButton: {
+  nextUpMeta: {
+    ...typography.bodySmall,
+    color: colors.neutral[600],
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  previewButton: {
     marginTop: spacing.xs,
   },
   modalOverlay: {
@@ -611,13 +839,52 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.neutral[900],
     marginBottom: spacing.sm,
+  },
+  successMessage: {
+    ...typography.body,
+    color: colors.neutral[700],
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  reviewNote: {
+    backgroundColor: colors.warning + '20',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  reviewNoteText: {
+    ...typography.bodySmall,
+    color: colors.neutral[800],
     textAlign: 'center',
   },
-  successText: {
-    ...typography.body,
-    color: colors.neutral[600],
-    textAlign: 'center',
+  successStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     marginBottom: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    ...typography.h2,
+    color: colors.primary[500],
+    fontWeight: typography.weights.bold,
+    marginBottom: spacing.xs,
+  },
+  statLabel: {
+    ...typography.bodySmall,
+    color: colors.neutral[600],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   successButtons: {
     width: '100%',
