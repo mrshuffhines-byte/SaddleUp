@@ -299,8 +299,43 @@ export default function DashboardScreen() {
         </View>
       </Card>
 
+      {/* AI Training Plan Generator - Always show when no active plan */}
+      {!activePlan && (
+        <Card style={styles.planGeneratorCard}>
+          <View style={styles.planGeneratorHeader}>
+            <Text style={styles.planGeneratorIcon}>🤖</Text>
+            <View style={styles.planGeneratorText}>
+              <Text style={styles.planGeneratorTitle}>AI Training Plan Generator</Text>
+              <Text style={styles.planGeneratorSubtitle}>
+                Get a personalized training plan tailored to you and your horse
+              </Text>
+            </View>
+          </View>
+          <View style={styles.planGeneratorFeatures}>
+            <View style={styles.planGeneratorFeature}>
+              <Text style={styles.planGeneratorFeatureIcon}>✨</Text>
+              <Text style={styles.planGeneratorFeatureText}>AI-powered personalized curriculum</Text>
+            </View>
+            <View style={styles.planGeneratorFeature}>
+              <Text style={styles.planGeneratorFeatureIcon}>🐴</Text>
+              <Text style={styles.planGeneratorFeatureText}>Tailored to your horse's needs</Text>
+            </View>
+            <View style={styles.planGeneratorFeature}>
+              <Text style={styles.planGeneratorFeatureIcon}>📈</Text>
+              <Text style={styles.planGeneratorFeatureText}>Progressive skill building</Text>
+            </View>
+          </View>
+          <Button
+            title="Generate My Training Plan"
+            onPress={() => router.push('/onboarding')}
+            style={styles.planGeneratorButton}
+            fullWidth
+          />
+        </Card>
+      )}
+
       {/* Next Lesson Card */}
-      {nextLesson ? (
+      {nextLesson && (
         <Pressable
           style={styles.nextLessonCard}
           onPress={() => router.push(`/lesson/${nextLesson.lessonId}`)}
@@ -318,18 +353,15 @@ export default function DashboardScreen() {
             </View>
           </Card>
         </Pressable>
-      ) : !activePlan ? (
-        <EmptyState
-          icon="📋"
-          title="No Training Plan Yet"
-          description="Let's create a personalized plan based on your goals and experience level."
-          actionLabel="Generate My Plan"
-          onAction={() => router.push('/onboarding')}
-        />
-      ) : null}
+      )}
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
+        <QuickActionButton
+          icon="🤖"
+          label="New Plan"
+          onPress={() => router.push('/onboarding')}
+        />
         <QuickActionButton
           icon="💬"
           label="Ask Trainer"
@@ -514,6 +546,54 @@ const styles = StyleSheet.create({
   statBadgeLabel: {
     ...typography.caption,
     color: colors.neutral[600],
+  },
+  planGeneratorCard: {
+    margin: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderWidth: 2,
+    borderColor: colors.primary[200],
+  },
+  planGeneratorHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  planGeneratorIcon: {
+    fontSize: 48,
+    marginRight: spacing.md,
+  },
+  planGeneratorText: {
+    flex: 1,
+  },
+  planGeneratorTitle: {
+    ...typography.h3,
+    color: colors.neutral[900],
+    marginBottom: spacing.xs,
+  },
+  planGeneratorSubtitle: {
+    ...typography.body,
+    color: colors.neutral[600],
+  },
+  planGeneratorFeatures: {
+    marginBottom: spacing.lg,
+  },
+  planGeneratorFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  planGeneratorFeatureIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
+  },
+  planGeneratorFeatureText: {
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+  },
+  planGeneratorButton: {
+    marginTop: spacing.sm,
   },
   nextLessonCard: {
     marginHorizontal: spacing.lg,

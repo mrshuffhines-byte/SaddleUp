@@ -148,10 +148,11 @@ export default function ChatScreen() {
       
       // If there's an initial message, send it
       if (initialMessage && initialMessage.trim()) {
+        // Use the main sendMessage function which handles everything properly
         setMessage(initialMessage.trim());
-        // Send the message after a brief delay to ensure conversation is set
+        // The user can now click send, or we can trigger it after a brief delay
         setTimeout(() => {
-          sendMessageWithConversation(data.id, initialMessage.trim());
+          sendMessage();
         }, 100);
       }
       
@@ -163,47 +164,71 @@ export default function ChatScreen() {
     }
   };
 
-  const sendMessageWithConversation = async (conversationId: string, messageText: string) => {
-    setMessage('');
-    setLoading(true);
-    setIsTyping(true);
 
+  const uploadMedia = async (uri: string, type: 'photo' | 'video'): Promise<string> => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch(`${API_URL}/api/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          conversationId,
-          content: messageText,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
+      if (!token) {
+        throw new Error('Not authenticated');
       }
 
-      // Reload conversation to get updated messages
-      await loadConversation(conversationId);
-      await loadConversations();
+      // Create FormData
+      const formData = new FormData();
+      
+      // Get file name and type from URI
+      const filename = uri.split('/').pop() || `media.${type === 'photo' ? 'jpg' : 'mp4'}`;
+      const match = /\.(\w+)$/.exec(filename);
+      const ext = match && match[1] ? match[1] : (type === 'photo' ? 'jpg' : 'mp4');
+      const typeFormValue = type === 'photo' ? 'image/jpeg' : 'video/mp4';
+      
+      // For web, we need to fetch the file as a blob first
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        formData.append('media', blob, filename);
+      } else {
+        // For native, use the URI directly
+        formData.append('media', {
+          uri,
+          type: typeFormValue,
+          name: filename,
+        } as any);
+      }
+
+      setUploadingMedia(true);
+
+      const uploadResponse = await fetch(`${API_URL}/api/media/upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Don't set Content-Type for FormData - let the browser set it with boundary
+        },
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to upload media');
+      }
+
+      const uploadData = await uploadResponse.json();
+      return uploadData.url;
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send message');
+      console.error('Media upload error:', error);
+      throw error;
     } finally {
-      setLoading(false);
-      setIsTyping(false);
+      setUploadingMedia(false);
     }
   };
 
   const sendMessage = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() && !selectedMedia) return;
 
     const messageText = message.trim();
+    const mediaToUpload = selectedMedia;
+    
     setMessage('');
+    setSelectedMedia(null);
     setLoading(true);
     setIsTyping(true);
 
@@ -212,6 +237,20 @@ export default function ChatScreen() {
       if (!token) {
         router.replace('/(auth)/login');
         return;
+      }
+
+      // Upload media first if present
+      let mediaUrls: string[] = [];
+      if (mediaToUpload) {
+        try {
+          const uploadedUrl = await uploadMedia(mediaToUpload.url, mediaToUpload.type);
+          mediaUrls = [uploadedUrl];
+        } catch (uploadError: any) {
+          Alert.alert('Upload Error', uploadError.message || 'Failed to upload media. Please try again.');
+          setMessage(messageText); // Restore message on error
+          setSelectedMedia(mediaToUpload); // Restore media on error
+          return;
+        }
       }
 
       // Create conversation if it doesn't exist
@@ -234,7 +273,7 @@ export default function ChatScreen() {
         setCurrentConversation(conversation);
       }
 
-      // Send the message
+      // Send the message with media URLs
       const response = await fetch(`${API_URL}/api/messages`, {
         method: 'POST',
         headers: {
@@ -243,7 +282,8 @@ export default function ChatScreen() {
         },
         body: JSON.stringify({
           conversationId: conversation.id,
-          content: messageText,
+          content: messageText || (mediaUrls.length > 0 ? '📷' : ''), // Send at least a placeholder if only media
+          mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
         }),
       });
 
@@ -259,6 +299,9 @@ export default function ChatScreen() {
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send message');
       setMessage(messageText); // Restore message on error
+      if (mediaToUpload) {
+        setSelectedMedia(mediaToUpload); // Restore media on error
+      }
     } finally {
       setLoading(false);
       setIsTyping(false);
