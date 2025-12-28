@@ -813,7 +813,10 @@ export default function OnboardingScreen() {
                   {loadingMethods ? (
                     <ActivityIndicator size="large" color={colors.primary[500]} style={styles.loadingSpinner} />
                   ) : methods.length === 0 ? (
-                    <Text style={styles.errorText}>No methods available. Please try again later.</Text>
+                    <View style={styles.emptyMethodsContainer}>
+                      <Text style={styles.errorText}>No training methods available.</Text>
+                      <Text style={styles.errorSubtext}>You can proceed without selecting methods, or try refreshing the page.</Text>
+                    </View>
                   ) : (
                     <View style={styles.methodsByCategory}>
                       {Object.entries(
@@ -877,8 +880,7 @@ export default function OnboardingScreen() {
                             })}
                           </View>
                         </View>
-                      ))
-                    )}
+                      ))}
                     </View>
                   )}
                 </Card>
