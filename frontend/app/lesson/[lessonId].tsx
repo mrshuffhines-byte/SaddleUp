@@ -666,14 +666,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   breadcrumb: {
-    ...typography.caption,
+    fontSize: typography.caption.fontSize,
+    fontWeight: typography.caption.fontWeight,
+    lineHeight: typography.caption.lineHeight,
     color: colors.neutral[500],
     marginBottom: spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   title: {
-    ...typography.h1,
+    fontSize: typography.h1.fontSize,
+    fontWeight: typography.h1.fontWeight,
+    lineHeight: typography.h1.lineHeight,
     color: colors.neutral[900],
     marginBottom: spacing.sm,
   },
@@ -686,7 +690,9 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   timeText: {
-    ...typography.bodySmall,
+    fontSize: typography.bodySmall.fontSize,
+    fontWeight: typography.bodySmall.fontWeight,
+    lineHeight: typography.bodySmall.lineHeight,
     color: colors.neutral[600],
   },
   warningCard: {
@@ -696,7 +702,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   warningText: {
-    ...typography.body,
+    fontSize: typography.body.fontSize,
+    fontWeight: typography.body.fontWeight,
+    lineHeight: typography.body.lineHeight,
     color: colors.neutral[800],
   },
   objectivesCard: {
@@ -709,7 +717,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   bullet: {
-    ...typography.body,
+    fontSize: typography.body.fontSize,
+    fontWeight: typography.body.fontWeight,
+    lineHeight: typography.body.lineHeight,
     color: colors.primary[700],
     marginRight: spacing.sm,
     marginTop: 2,
@@ -726,7 +736,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   equipmentCheck: {
-    ...typography.body,
+    fontSize: typography.body.fontSize,
+    fontWeight: typography.body.fontWeight,
+    lineHeight: typography.body.lineHeight,
     color: colors.success,
     marginRight: spacing.sm,
     marginTop: 2,
