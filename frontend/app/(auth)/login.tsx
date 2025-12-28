@@ -17,7 +17,7 @@ import { API_URL } from '../constants';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import { Input, Button } from '../../components/ui';
 import Card from '../../components/ui/Card';
-import { ScreenBackground } from '../../components/ui';
+import { ScreenBackground } from '../components/ui/ScreenBackground';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -105,7 +105,7 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-            {/* Header Section */}
+            {/* Header Section - Strengthened hierarchy */}
             <View style={styles.headerSection}>
               <View style={styles.logoContainer}>
                 <Text style={styles.logoIcon}>🐴</Text>
@@ -116,7 +116,7 @@ export default function LoginScreen() {
               </Text>
             </View>
 
-            {/* Login Card */}
+            {/* Login Card - Enhanced with better spacing and shadow */}
             <Card style={styles.formCard} variant="elevated">
               <View style={styles.formContent}>
                 <Input
@@ -156,7 +156,9 @@ export default function LoginScreen() {
                       <TouchableOpacity
                         onPress={() => setShowPassword(!showPassword)}
                         style={styles.eyeButton}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                        accessibilityRole="button"
                       >
                         <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                       </TouchableOpacity>
@@ -164,16 +166,19 @@ export default function LoginScreen() {
                   />
                 </View>
 
+                {/* Forgot Password - More visible but not distracting */}
                 <TouchableOpacity 
                   style={styles.forgotPasswordLink}
                   onPress={() => {
                     Alert.alert('Forgot Password', 'Please contact support or try logging in again.');
                   }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
 
+                {/* Primary Button - More confident and tappable */}
                 <Button
                   title="Sign In"
                   onPress={handleLogin}
@@ -186,12 +191,13 @@ export default function LoginScreen() {
               </View>
             </Card>
 
-            {/* Signup CTA */}
+            {/* Signup CTA - More inviting */}
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>New to SaddleUp? </Text>
               <TouchableOpacity 
                 onPress={() => router.push('/(auth)/signup')}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="link"
               >
                 <Text style={styles.signupLink}>Create an account</Text>
               </TouchableOpacity>
@@ -211,111 +217,120 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.lg,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.xxl + spacing.lg, // More breathing room at top
+    paddingBottom: spacing.xxl + spacing.lg,
   },
   content: {
     width: '100%',
     maxWidth: 440,
     alignSelf: 'center',
   },
-  // Header Section - Improved hierarchy
+  // Header Section - Strengthened visual hierarchy
   headerSection: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxl, // Increased spacing to separate from card
     alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl, // Increased from lg
   },
   logoIcon: {
     fontSize: 72,
   },
   title: {
     ...typography.h1,
-    fontSize: 36,
+    fontSize: 40, // Increased from 36 for stronger presence
     fontWeight: '700',
-    color: colors.neutral[900],
+    color: colors.neutral[900], // High contrast for readability
     textAlign: 'center',
-    marginBottom: spacing.xs,
-    letterSpacing: -0.8,
+    marginBottom: spacing.sm, // Increased from xs
+    letterSpacing: -1, // Tighter letter spacing for premium feel
   },
   tagline: {
     ...typography.body,
     fontSize: 17,
-    color: colors.neutral[600],
+    color: colors.neutral[700], // Slightly darker for better contrast (WCAG AA)
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 26, // Increased from 24 for better readability
+    paddingHorizontal: spacing.md,
   },
-  // Login Card - Enhanced with better spacing and shadow
+  // Login Card - Enhanced with better spacing, border radius, and subtle shadow
   formCard: {
-    padding: spacing.xl + spacing.md, // Increased from lg to xl + md
+    padding: spacing.xxl, // Increased from xl + md for more breathing room
     marginBottom: spacing.xl,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.xl + 4, // Slightly increased for modern feel
     backgroundColor: colors.surface,
+    // Shadow will come from Card variant="elevated"
   },
   formContent: {
     width: '100%',
   },
   inputContainer: {
-    marginBottom: spacing.lg, // Increased from md to lg
+    marginBottom: spacing.xl, // Increased from lg for better field separation
   },
   input: {
-    fontSize: 16, // Ensure minimum 16px for readability
-    paddingVertical: spacing.md + 2, // Slightly increased for better tap target
-    minHeight: 52, // WCAG AA minimum tap target size
+    fontSize: 16, // Minimum 16px for readability (prevents iOS zoom)
+    paddingVertical: spacing.md + 4, // Increased for better tap target and comfort
+    minHeight: 56, // Increased from 52 for better accessibility (WCAG AA)
   },
   passwordContainer: {
     position: 'relative',
   },
   eyeButton: {
-    padding: spacing.sm,
-    minWidth: 44,
-    minHeight: 44,
+    padding: spacing.md, // Increased from sm
+    minWidth: 48, // Increased for better tap target (WCAG AA)
+    minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
   eyeIconText: {
     fontSize: 22,
-    opacity: 0.7,
+    opacity: 0.65, // Slightly more subtle
   },
-  // Primary Button - More confident and tappable
+  // Primary Button - More confident, tappable, with better contrast
   signInButton: {
-    marginTop: spacing.lg,
-    minHeight: 56, // Large tap target
-    paddingVertical: spacing.md + 6,
+    marginTop: spacing.xl, // Increased from lg
+    minHeight: 56, // Large tap target (WCAG AA)
+    paddingVertical: spacing.md + 8, // Increased for more confident feel
   },
   // Forgot Password - More visible but not distracting
   forgotPasswordLink: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md, // Reduced from lg to bring it closer to password field
     alignItems: 'flex-end',
     alignSelf: 'flex-end',
+    minHeight: 44, // WCAG AA minimum tap target
+    justifyContent: 'center',
+    paddingVertical: spacing.xs, // Extra padding for easier tapping
   },
   forgotPasswordText: {
     ...typography.bodySmall,
     fontSize: 15,
-    color: colors.primary[600],
-    fontWeight: '500',
+    color: colors.primary[700], // Darker for better contrast (WCAG AA)
+    fontWeight: '600', // Increased from 500 for better visibility
   },
-  // Signup CTA - More inviting
+  // Signup CTA - More inviting and prominent
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl, // Increased from xl for better separation
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm, // Added vertical padding
   },
   signupText: {
     ...typography.body,
     fontSize: 16,
-    color: colors.neutral[600],
+    color: colors.neutral[700], // Darker for better contrast (WCAG AA)
+    lineHeight: 24,
   },
   signupLink: {
     ...typography.body,
     fontSize: 16,
-    color: colors.primary[700],
-    fontWeight: '600',
+    color: colors.primary[700], // Darker for better contrast and prominence
+    fontWeight: '700', // Increased from 600 for more inviting feel
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.primary[400],
   },
 });
