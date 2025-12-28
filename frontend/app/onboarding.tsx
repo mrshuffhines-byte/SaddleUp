@@ -329,12 +329,36 @@ export default function OnboardingScreen() {
 
   const progress = (step / TOTAL_STEPS) * 100;
 
+  const handleBackToDashboard = () => {
+    Alert.alert(
+      'Exit Plan Generator?',
+      'Your progress will be saved. You can return to complete it anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Go to Dashboard',
+          onPress: () => router.replace('/(tabs)/dashboard'),
+        },
+      ]
+    );
+  };
+
   return (
     <ScreenBackground variant="default">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
+        {/* Header with Back Button */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.headerBackButton}
+            onPress={handleBackToDashboard}
+          >
+            <Text style={styles.headerBackButtonText}>← Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+        
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -960,6 +984,26 @@ function OptionCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerContainer: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: 'transparent',
+  },
+  headerBackButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.neutral[100],
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+  },
+  headerBackButtonText: {
+    ...typography.body,
+    color: colors.primary[700],
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
