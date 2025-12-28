@@ -41,6 +41,8 @@ model UserProfile {
   horseDetails    String?
   returningTimeGap String? // 1-2, 3-5, 5-10, 10-20, 20+ (years since riding regularly)
   horseAccess     String? // lease, lessons, planning, other (if doesn't own horse)
+  methodPreference String? @default("explore") // explore, blend, single
+  selectedMethods  Json? // Array of method IDs for blend/single mode
   createdAt       DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

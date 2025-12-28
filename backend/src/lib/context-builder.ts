@@ -11,6 +11,8 @@ export interface ComprehensiveContext {
   horse?: any;
   rider: {
     profile?: any;
+    methodPreference?: string;
+    selectedMethods?: string[];
     methodExperience?: any[];
     methodRatings?: any[];
     physicalLimitations?: any[];
@@ -99,6 +101,8 @@ export async function buildComprehensiveContext(params: {
   
   // Use type assertion and optional chaining for fields not yet in schema
   const profile = user?.profile as any;
+  const methodPreference = profile?.methodPreference || 'explore';
+  const selectedMethods = profile?.selectedMethods as string[] || [];
   const experiencedMethods = profile?.experiencedMethods || [];
   const physicalLimitations = profile?.physicalLimitations || [];
   const confidenceAreas = profile?.confidenceAreas || [];
@@ -109,10 +113,25 @@ export async function buildComprehensiveContext(params: {
   // Combine and enrich with method details
   const methodExperience: any[] = [];
   const methodMap = new Map();
+  const methodIdsToFetch = new Set<string>();
+
+  // Add from profile selectedMethods (from onboarding)
+  if (selectedMethods && Array.isArray(selectedMethods) && selectedMethods.length > 0) {
+    selectedMethods.forEach((methodId: string) => {
+      methodIdsToFetch.add(methodId);
+      methodMap.set(methodId, {
+        methodId,
+        comfortLevel: 3, // Default to medium if no rating yet
+        yearsExperience: 0,
+        source: 'onboarding',
+      });
+    });
+  }
 
   // Add from methodRatings
   if (methodRatings && Array.isArray(methodRatings)) {
     methodRatings.forEach((mr: any) => {
+      methodIdsToFetch.add(mr.methodId);
       methodMap.set(mr.methodId, {
         methodId: mr.methodId,
         comfortLevel: mr.comfortLevel || 3,
@@ -125,6 +144,7 @@ export async function buildComprehensiveContext(params: {
   // Add from profile experiencedMethods
   if (experiencedMethods && Array.isArray(experiencedMethods)) {
     experiencedMethods.forEach((em: any) => {
+      methodIdsToFetch.add(em.methodId);
       const existing = methodMap.get(em.methodId);
       if (!existing || existing.comfortLevel < em.comfortLevel) {
         methodMap.set(em.methodId, {
@@ -138,11 +158,10 @@ export async function buildComprehensiveContext(params: {
   }
 
   // Fetch method details for each
-  const methodIds = Array.from(methodMap.keys());
-  if (methodIds.length > 0) {
+  if (methodIdsToFetch.size > 0) {
     const methods = await prisma.horsemanshipMethod.findMany({
       where: {
-        id: { in: methodIds },
+        id: { in: Array.from(methodIdsToFetch) },
       },
     });
 
@@ -168,6 +187,8 @@ export async function buildComprehensiveContext(params: {
     horse: horse || undefined,
     rider: {
       profile: user?.profile || undefined,
+      methodPreference: methodPreference,
+      selectedMethods: selectedMethods.length > 0 ? selectedMethods : undefined,
       methodExperience: methodExperience.length > 0 ? methodExperience : undefined,
       methodRatings: methodRatings.length > 0 ? methodRatings : undefined,
       physicalLimitations: (user?.profile as any)?.physicalLimitations as any[] || undefined,
@@ -276,6 +297,53 @@ export function buildAIContextPrompt(context: ComprehensiveContext): string {
     prompt += '\n';
   }
 
+  // Method preference and selected methods
+  if (context.rider.methodPreference) {
+    const preference = context.rider.methodPreference;
+    const selectedMethodIds = context.rider.selectedMethods || [];
+    
+    prompt += `\n**METHOD PREFERENCE:**\n`;
+    if (preference === 'explore') {
+      prompt += `The rider wants to explore all methods - draw from various training approaches as appropriate, introducing different perspectives and techniques.\n`;
+    } else if (preference === 'blend') {
+      prompt += `The rider wants to blend multiple methods. `;
+      if (selectedMethodIds.length > 0) {
+        prompt += `They've selected these methods as of interest:\n`;
+        // Fetch method names for selected IDs
+        if (context.rider.methodExperience) {
+          const selectedMethods = context.rider.methodExperience.filter((me: any) => 
+            selectedMethodIds.includes(me.method.id)
+          );
+          selectedMethods.forEach((me: any) => {
+            prompt += `- ${me.method.name} (${me.method.category})\n`;
+          });
+        }
+        prompt += `\nBlend techniques from these selected methods, showing how they complement each other. Explain which method each technique comes from when blending.\n`;
+      }
+    } else if (preference === 'single') {
+      prompt += `The rider wants to focus on a single method. `;
+      if (selectedMethodIds.length > 0 && context.rider.methodExperience) {
+        const primaryMethod = context.rider.methodExperience.find((me: any) => 
+          selectedMethodIds[0] === me.method.id
+        );
+        if (primaryMethod) {
+          prompt += `Focus on: ${primaryMethod.method.name} (${primaryMethod.method.category})\n`;
+          if (primaryMethod.method.philosophy) {
+            prompt += `Philosophy: ${primaryMethod.method.philosophy}\n`;
+          }
+          if (primaryMethod.method.keyPrinciples) {
+            prompt += `Key Principles: ${JSON.stringify(primaryMethod.method.keyPrinciples)}\n`;
+          }
+          if (primaryMethod.method.commonTerminology) {
+            prompt += `Common Terminology: ${JSON.stringify(primaryMethod.method.commonTerminology)}\n`;
+          }
+          prompt += `\nFrame all recommendations through this method's perspective, use its terminology, and reference its specific exercises or principles.\n`;
+        }
+      }
+    }
+    prompt += '\n';
+  }
+
   // Method experience
   if (context.rider.methodExperience && context.rider.methodExperience.length > 0) {
     prompt += `\n**RIDER METHOD EXPERIENCE:**\n`;
@@ -289,13 +357,17 @@ export function buildAIContextPrompt(context: ComprehensiveContext): string {
         prompt += `  Key Principles: ${JSON.stringify(me.method.keyPrinciples)}\n`;
       }
     });
-    prompt += `\n**INSTRUCTIONS FOR METHOD BLENDING:**\n`;
-    prompt += `- Blend techniques from methods the rider has experience with (higher comfort levels)\n`;
-    prompt += `- Reference familiar terminology and exercises from their known methods\n`;
-    prompt += `- For methods with lower comfort levels, provide more detailed explanations\n`;
-    prompt += `- When blending methods, explain which method each technique comes from\n`;
-    prompt += `- Prioritize methods where the rider has higher comfort levels\n`;
-    prompt += `- Show how different methods approach similar concepts\n`;
+    
+    if (context.rider.methodPreference === 'blend' || context.rider.methodPreference === 'explore') {
+      prompt += `\n**INSTRUCTIONS FOR METHOD BLENDING:**\n`;
+      prompt += `- Blend techniques from methods the rider has experience with (higher comfort levels)\n`;
+      prompt += `- Reference familiar terminology and exercises from their known methods\n`;
+      prompt += `- For methods with lower comfort levels, provide more detailed explanations\n`;
+      prompt += `- When blending methods, explain which method each technique comes from\n`;
+      prompt += `- Prioritize methods where the rider has higher comfort levels\n`;
+      prompt += `- Show how different methods approach similar concepts\n`;
+      prompt += `- Adapt techniques based on what works best for the specific horse-rider combination\n`;
+    }
     prompt += '\n';
   }
 

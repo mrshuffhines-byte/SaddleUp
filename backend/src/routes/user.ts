@@ -14,6 +14,8 @@ const onboardingSchema = z.object({
   horseDetails: z.string().optional(),
   returningTimeGap: z.enum(['1-2', '3-5', '5-10', '10-20', '20+']).optional(),
   horseAccess: z.enum(['lease', 'lessons', 'planning', 'other']).optional(),
+  methodPreference: z.enum(['explore', 'blend', 'single']).optional(),
+  selectedMethods: z.array(z.string()).optional(),
 });
 
 // Get current user
@@ -79,6 +81,8 @@ router.post('/profile', authenticate, async (req: AuthRequest, res: Response) =>
         horseDetails: data.horseDetails || null,
         returningTimeGap: data.returningTimeGap || null,
         horseAccess: data.horseAccess || null,
+        methodPreference: data.methodPreference || 'explore',
+        selectedMethods: data.selectedMethods || null,
         updatedAt: new Date(),
       },
       create: {
@@ -91,6 +95,8 @@ router.post('/profile', authenticate, async (req: AuthRequest, res: Response) =>
         horseDetails: data.horseDetails || null,
         returningTimeGap: data.returningTimeGap || null,
         horseAccess: data.horseAccess || null,
+        methodPreference: data.methodPreference || 'explore',
+        selectedMethods: data.selectedMethods || null,
       },
     });
 

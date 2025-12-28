@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import Animated, { 
   useSharedValue, 
@@ -26,7 +27,7 @@ import { Button, ProgressBar, ScreenBackground } from '../components/ui';
 import Card from '../components/ui/Card';
 import { Input } from '../components/ui';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const EXPERIENCE_LEVELS = [
   {
@@ -150,9 +151,32 @@ export default function OnboardingScreen() {
     horseTrained: '',
     horseIssues: [] as string[],
     horseNotes: '',
+    methodPreference: 'explore' as 'explore' | 'blend' | 'single',
+    selectedMethods: [] as string[],
   });
   const router = useRouter();
-  const scaleAnim = useState(new Animated.Value(1))[0];
+  const [methods, setMethods] = useState<any[]>([]);
+  const [loadingMethods, setLoadingMethods] = useState(false);
+
+  useEffect(() => {
+    // Load methods when component mounts (for step 5)
+    loadMethods();
+  }, []);
+
+  const loadMethods = async () => {
+    try {
+      setLoadingMethods(true);
+      const response = await fetch(`${API_URL}/api/methods`);
+      if (response.ok) {
+        const data = await response.json();
+        setMethods(data);
+      }
+    } catch (error) {
+      console.error('Failed to load methods:', error);
+    } finally {
+      setLoadingMethods(false);
+    }
+  };
 
   const handleNext = () => {
     if (step === 1 && !formData.experienceLevel) {
@@ -169,6 +193,10 @@ export default function OnboardingScreen() {
     }
     if (step === 4 && formData.ownsHorse && !formData.horseName.trim()) {
       Alert.alert('Horse name required', 'Please enter your horse\'s name');
+      return;
+    }
+    if (step === 5 && formData.methodPreference !== 'explore' && formData.selectedMethods.length === 0) {
+      Alert.alert('Please select', 'Please select at least one horsemanship method');
       return;
     }
     if (step < TOTAL_STEPS) {
@@ -237,6 +265,8 @@ export default function OnboardingScreen() {
           ...(formData.returningTimeGap && { returningTimeGap: formData.returningTimeGap }),
           ...(!formData.ownsHorse && formData.horseAccess && { horseAccess: formData.horseAccess }),
           horseDetails: formData.ownsHorse && formData.horseName ? `${formData.horseName}` : undefined,
+          methodPreference: formData.methodPreference,
+          selectedMethods: formData.selectedMethods.length > 0 ? formData.selectedMethods : undefined,
         }),
       });
 
@@ -676,6 +706,150 @@ export default function OnboardingScreen() {
                   </View>
                 )}
               </Card>
+            </View>
+          )}
+
+          {/* Step 5: Horsemanship Method Selection */}
+          {step === 5 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>What horsemanship approach interests you?</Text>
+              <Text style={styles.stepSubtitle}>
+                We'll blend methods to create the best training for you and your horse
+              </Text>
+
+              {/* Preference Selection */}
+              <Card style={styles.methodPreferenceCard}>
+                <Text style={styles.sectionLabel}>Your approach preference:</Text>
+                <View style={styles.preferenceOptions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.preferenceOption,
+                      formData.methodPreference === 'explore' && styles.preferenceOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setFormData({ ...formData, methodPreference: 'explore', selectedMethods: [] });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.preferenceIcon}>🔍</Text>
+                    <Text style={[styles.preferenceLabel, formData.methodPreference === 'explore' && styles.preferenceLabelSelected]}>
+                      Explore All Methods
+                    </Text>
+                    <Text style={[styles.preferenceDesc, formData.methodPreference === 'explore' && styles.preferenceDescSelected]}>
+                      Show me techniques from various methods - I want to learn what works
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.preferenceOption,
+                      formData.methodPreference === 'blend' && styles.preferenceOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setFormData({ ...formData, methodPreference: 'blend' });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.preferenceIcon}>🎨</Text>
+                    <Text style={[styles.preferenceLabel, formData.methodPreference === 'blend' && styles.preferenceLabelSelected]}>
+                      Blend Methods
+                    </Text>
+                    <Text style={[styles.preferenceDesc, formData.methodPreference === 'blend' && styles.preferenceDescSelected]}>
+                      Combine techniques from multiple methods I'm interested in
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.preferenceOption,
+                      formData.methodPreference === 'single' && styles.preferenceOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setFormData({ ...formData, methodPreference: 'single' });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.preferenceIcon}>🎯</Text>
+                    <Text style={[styles.preferenceLabel, formData.methodPreference === 'single' && styles.preferenceLabelSelected]}>
+                      Focus on One Method
+                    </Text>
+                    <Text style={[styles.preferenceDesc, formData.methodPreference === 'single' && styles.preferenceDescSelected]}>
+                      I want to focus on a specific training method
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Card>
+
+              {/* Method Selection (only show if not 'explore') */}
+              {formData.methodPreference !== 'explore' && (
+                <Card style={styles.methodSelectionCard}>
+                  <Text style={styles.sectionLabel}>
+                    {formData.methodPreference === 'blend' 
+                      ? 'Select methods you're interested in (pick 2-4):'
+                      : 'Select your preferred method:'}
+                  </Text>
+                  
+                  {loadingMethods ? (
+                    <ActivityIndicator size="large" color={colors.primary[500]} style={styles.loadingSpinner} />
+                  ) : (
+                    <View style={styles.methodsByCategory}>
+                      {Object.entries(
+                        methods.reduce((acc: any, method: any) => {
+                          if (!acc[method.category]) acc[method.category] = [];
+                          acc[method.category].push(method);
+                          return acc;
+                        }, {})
+                      ).map(([category, categoryMethods]: [string, any]) => (
+                        <View key={category} style={styles.methodCategory}>
+                          <Text style={styles.categoryTitle}>{category}</Text>
+                          <View style={styles.methodGrid}>
+                            {categoryMethods.map((method: any) => {
+                              const isSelected = formData.selectedMethods.includes(method.id);
+                              const canSelect = formData.methodPreference === 'blend' 
+                                ? formData.selectedMethods.length < 4 
+                                : formData.selectedMethods.length === 0;
+                              
+                              return (
+                                <TouchableOpacity
+                                  key={method.id}
+                                  style={[
+                                    styles.methodChip,
+                                    isSelected && styles.methodChipSelected,
+                                    !isSelected && !canSelect && styles.methodChipDisabled,
+                                  ]}
+                                  onPress={() => {
+                                    if (formData.methodPreference === 'single') {
+                                      setFormData({ ...formData, selectedMethods: [method.id] });
+                                    } else {
+                                      if (isSelected) {
+                                        setFormData({ 
+                                          ...formData, 
+                                          selectedMethods: formData.selectedMethods.filter(id => id !== method.id) 
+                                        });
+                                      } else if (canSelect) {
+                                        setFormData({ 
+                                          ...formData, 
+                                          selectedMethods: [...formData.selectedMethods, method.id] 
+                                        });
+                                      }
+                                    }
+                                  }}
+                                  disabled={!isSelected && !canSelect}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={[styles.methodChipText, isSelected && styles.methodChipTextSelected]}>
+                                    {method.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </Card>
+              )}
             </View>
           )}
 
@@ -1297,6 +1471,91 @@ const styles = StyleSheet.create({
   },
   energyLevelTextSelected: {
     color: colors.neutral[50],
+  },
+  methodPreferenceCard: {
+    marginBottom: spacing.lg,
+  },
+  preferenceOptions: {
+    gap: spacing.md,
+  },
+  preferenceOption: {
+    backgroundColor: colors.neutral[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.neutral[200],
+    ...shadows.sm,
+  },
+  preferenceOptionSelected: {
+    backgroundColor: colors.primary[500],
+    borderColor: colors.primary[600],
+    ...shadows.md,
+  },
+  preferenceIcon: {
+    fontSize: 32,
+    marginBottom: spacing.sm,
+  },
+  preferenceLabel: {
+    ...typography.h4,
+    color: colors.neutral[900],
+    marginBottom: spacing.xs,
+    fontWeight: typography.weights.semibold,
+  },
+  preferenceLabelSelected: {
+    color: colors.neutral[50],
+  },
+  preferenceDesc: {
+    ...typography.bodySmall,
+    color: colors.neutral[600],
+  },
+  preferenceDescSelected: {
+    color: colors.primary[100],
+  },
+  methodSelectionCard: {
+    marginTop: spacing.md,
+  },
+  methodsByCategory: {
+    gap: spacing.lg,
+  },
+  methodCategory: {
+    marginBottom: spacing.md,
+  },
+  categoryTitle: {
+    ...typography.h4,
+    color: colors.neutral[700],
+    marginBottom: spacing.sm,
+    fontWeight: typography.weights.semibold,
+  },
+  methodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  methodChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
+    borderColor: colors.neutral[300],
+    backgroundColor: colors.neutral[50],
+  },
+  methodChipSelected: {
+    backgroundColor: colors.primary[500],
+    borderColor: colors.primary[600],
+  },
+  methodChipDisabled: {
+    opacity: 0.5,
+  },
+  methodChipText: {
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+  },
+  methodChipTextSelected: {
+    color: colors.neutral[50],
+    fontWeight: typography.weights.semibold,
+  },
+  loadingSpinner: {
+    padding: spacing.xl,
   },
   safetyNote: {
     ...typography.bodySmall,
