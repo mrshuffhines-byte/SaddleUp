@@ -737,12 +737,11 @@ const styles = StyleSheet.create({
   },
   equipmentCheck: {
     fontSize: typography.body.fontSize,
-    fontWeight: typography.body.fontWeight,
+    fontWeight: typography.weights.bold,
     lineHeight: typography.body.lineHeight,
     color: colors.success,
     marginRight: spacing.sm,
     marginTop: 2,
-    fontWeight: typography.weights.bold,
   },
   equipmentTextContainer: {
     flex: 1,
