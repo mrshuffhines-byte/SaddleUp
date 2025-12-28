@@ -8,4 +8,5 @@ export { default as EmptyState } from './EmptyState';
 export { default as Skeleton } from './Skeleton';
 export { default as Toast } from './Toast';
 export { TooltipText, horseGlossary } from './Tooltip';
+export { ScreenBackground } from '../../app/components/ui/ScreenBackground';
 
