@@ -157,6 +157,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const [methods, setMethods] = useState<any[]>([]);
   const [loadingMethods, setLoadingMethods] = useState(false);
+  const [methodsError, setMethodsError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load methods when component mounts (for step 5)
@@ -166,13 +167,22 @@ export default function OnboardingScreen() {
   const loadMethods = async () => {
     try {
       setLoadingMethods(true);
+      setMethodsError(null);
       const response = await fetch(`${API_URL}/api/methods`);
       if (response.ok) {
         const data = await response.json();
         setMethods(data);
+        if (data.length === 0) {
+          setMethodsError('No methods found in database. Please ensure the database has been seeded.');
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to load methods:', response.status, errorText);
+        setMethodsError(`Failed to load methods: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.error('Failed to load methods:', error);
+      setMethodsError(`Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoadingMethods(false);
     }
@@ -815,7 +825,17 @@ export default function OnboardingScreen() {
                   ) : methods.length === 0 ? (
                     <View style={styles.emptyMethodsContainer}>
                       <Text style={styles.errorText}>No training methods available.</Text>
-                      <Text style={styles.errorSubtext}>You can proceed without selecting methods, or try refreshing the page.</Text>
+                      {methodsError ? (
+                        <Text style={styles.errorSubtext}>{methodsError}</Text>
+                      ) : (
+                        <Text style={styles.errorSubtext}>You can proceed without selecting methods, or try refreshing the page.</Text>
+                      )}
+                      <TouchableOpacity 
+                        onPress={loadMethods}
+                        style={styles.retryButton}
+                      >
+                        <Text style={styles.retryButtonText}>Retry Loading Methods</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.methodsByCategory}>
@@ -1633,6 +1653,19 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.neutral[600],
     textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  retryButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.md,
+  },
+  retryButtonText: {
+    ...typography.body,
+    color: colors.surface,
+    fontWeight: '600',
   },
   safetyNote: {
     ...typography.bodySmall,

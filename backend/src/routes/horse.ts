@@ -144,36 +144,38 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
                 temperamentValue = [data.temperament];
               } else if (Array.isArray(data.temperament)) {
                 temperamentValue = data.temperament;
-              } else {
-                temperamentValue = undefined;
               }
             }
 
+            // Build update object with only defined fields
+            const updateData: any = {
+              name: data.name,
+            };
+
+            if (data.breed !== undefined) updateData.breed = data.breed;
+            if (data.age !== undefined) updateData.age = data.age;
+            if (data.sex !== undefined) updateData.sex = data.sex;
+            if (data.height !== undefined) updateData.height = data.height;
+            if (data.weight !== undefined) updateData.weight = data.weight;
+            if (temperamentValue !== undefined) updateData.temperament = temperamentValue;
+            if (data.energyLevel !== undefined) updateData.energyLevel = data.energyLevel;
+            if (data.learningStyle !== undefined) updateData.learningStyle = data.learningStyle;
+            if (data.primaryUse !== undefined) updateData.primaryUse = data.primaryUse;
+            if (data.trainingLevel !== undefined) updateData.trainingLevel = data.trainingLevel;
+            if (data.isProfessionallyTrained !== undefined) updateData.isProfessionallyTrained = data.isProfessionallyTrained;
+            if (data.trainingHistory !== undefined) updateData.trainingHistory = data.trainingHistory;
+            if (data.knownCues !== undefined) updateData.knownCues = data.knownCues;
+            if (data.knownIssues !== undefined) updateData.knownIssues = data.knownIssues;
+            if (data.injuries !== undefined) updateData.injuries = data.injuries;
+            if (data.healthConditions !== undefined) updateData.healthConditions = data.healthConditions;
+            if (data.pastTrauma !== undefined) updateData.pastTrauma = data.pastTrauma;
+            if (data.goodWith !== undefined) updateData.goodWith = data.goodWith;
+            if (data.struggles !== undefined) updateData.struggles = data.struggles;
+            if (data.notes !== undefined) updateData.notes = data.notes;
+
             const updated = await prisma.horse.update({
               where: { id: req.params.id },
-              data: {
-                name: data.name,
-                breed: data.breed,
-                age: data.age,
-                sex: data.sex,
-                height: data.height,
-                weight: data.weight,
-                temperament: temperamentValue !== undefined ? temperamentValue : undefined,
-                energyLevel: data.energyLevel,
-                learningStyle: data.learningStyle !== undefined ? (data.learningStyle || undefined) : undefined,
-                primaryUse: data.primaryUse !== undefined ? (data.primaryUse || undefined) : undefined,
-                trainingLevel: data.trainingLevel,
-                isProfessionallyTrained: data.isProfessionallyTrained !== undefined ? (data.isProfessionallyTrained ?? undefined) : undefined,
-                trainingHistory: data.trainingHistory !== undefined ? (data.trainingHistory || undefined) : undefined,
-                knownCues: data.knownCues !== undefined ? (data.knownCues || undefined) : undefined,
-                knownIssues: data.knownIssues !== undefined ? (data.knownIssues || undefined) : undefined,
-                injuries: data.injuries !== undefined ? (data.injuries || undefined) : undefined,
-                healthConditions: data.healthConditions !== undefined ? (data.healthConditions || undefined) : undefined,
-                pastTrauma: data.pastTrauma !== undefined ? (data.pastTrauma || undefined) : undefined,
-                goodWith: data.goodWith !== undefined ? (data.goodWith || undefined) : undefined,
-                struggles: data.struggles !== undefined ? (data.struggles || undefined) : undefined,
-                notes: data.notes,
-              },
+              data: updateData,
             });
 
     res.json(updated);

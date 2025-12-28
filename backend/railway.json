@@ -5,10 +5,11 @@
   },
   "deploy": {
     "numReplicas": 1,
-    "startCommand": "npm run db:push && npm run start",
+    "startCommand": "npm run db:push && npm run seed:methods || true && npm run start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
 }
+

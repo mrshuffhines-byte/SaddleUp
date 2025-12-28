@@ -25,6 +25,37 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// Admin endpoint to seed methods (for development/debugging)
+// In production, this should be protected with admin authentication
+router.post('/seed', async (req: Request, res: Response) => {
+  try {
+    // Simple protection: only allow in development or with a secret
+    const adminSecret = process.env.ADMIN_SEED_SECRET;
+    if (process.env.NODE_ENV === 'production' && adminSecret) {
+      const providedSecret = req.headers['x-admin-secret'];
+      if (providedSecret !== adminSecret) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
+
+    // Import and run seed function
+    const { seedMethods } = await import('../lib/seed-methods');
+    const result = await seedMethods();
+    
+    res.json({ 
+      success: true, 
+      message: `Seeded ${result.seeded} new methods and updated ${result.updated} existing methods.`,
+      total: result.total
+    });
+  } catch (error: any) {
+    console.error('Seed methods error:', error);
+    res.status(500).json({ 
+      error: 'Failed to seed methods', 
+      details: error.message 
+    });
+  }
+});
+
 // Get single method
 router.get('/:id', async (req: Request, res: Response) => {
   try {
