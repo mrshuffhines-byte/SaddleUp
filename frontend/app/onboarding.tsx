@@ -593,14 +593,26 @@ export default function OnboardingScreen() {
                       ))}
                     </View>
 
-                    {formData.horseTemperament === 'unpredictable' && (
-                      <View style={styles.warningBox}>
-                        <Text style={styles.warningIcon}>⚠️</Text>
-                        <Text style={styles.warningText}>
-                          Working with an unpredictable horse as a beginner can be dangerous. 
-                          We strongly recommend having an experienced person present or consulting 
-                          a professional trainer before starting.
+                    {(formData.horseTemperament === 'nervous' || 
+                      formData.horseTemperament === 'stubborn' || 
+                      formData.horseTemperament === 'unpredictable') && (
+                      <View style={[
+                        styles.warningBox,
+                        formData.horseTemperament === 'unpredictable' && styles.warningBoxCritical
+                      ]}>
+                        <Text style={styles.warningIcon}>
+                          {formData.horseTemperament === 'unpredictable' ? '⚠️' : '💡'}
                         </Text>
+                        <View style={styles.warningContent}>
+                          <Text style={styles.warningText}>
+                            {formData.horseTemperament === 'unpredictable' 
+                              ? 'Working with an unpredictable horse as a beginner can be dangerous. We strongly recommend having an experienced person present or consulting a professional trainer before starting.'
+                              : formData.horseTemperament === 'nervous'
+                              ? 'Nervous or spooky horses require extra patience and calm handling. Start with short, positive sessions and consider working with a trainer who can help you build your horse\'s confidence safely.'
+                              : 'Stubborn horses often test boundaries and may require more consistent, patient training. Make sure you have clear, fair boundaries and consider professional guidance to ensure you\'re using effective techniques.'
+                            }
+                          </Text>
+                        </View>
                       </View>
                     )}
 
@@ -1245,23 +1257,29 @@ const styles = StyleSheet.create({
     color: colors.neutral[100],
   },
   warningBox: {
-    backgroundColor: colors.warning + '20',
+    backgroundColor: colors.info + '20',
     borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
+    borderLeftColor: colors.info,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     marginTop: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
   },
+  warningBoxCritical: {
+    backgroundColor: colors.warning + '20',
+    borderLeftColor: colors.warning,
+  },
   warningIcon: {
     fontSize: typography.h4.fontSize,
     marginRight: spacing.sm,
   },
+  warningContent: {
+    flex: 1,
+  },
   warningText: {
     ...typography.bodySmall,
-    color: colors.warning,
-    flex: 1,
+    color: colors.neutral[700],
     lineHeight: typography.bodySmall.lineHeight,
   },
   radioGroup: {
