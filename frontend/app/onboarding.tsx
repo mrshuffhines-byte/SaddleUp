@@ -390,8 +390,15 @@ export default function OnboardingScreen() {
     if (step === 6 && !formData.ownsHorse) return 5; // Step 5 was skipped
     return step;
   };
+  
+  // Calculate effective total steps (5 if step 5 is skipped, 6 otherwise)
+  const getEffectiveTotalSteps = () => {
+    return formData.ownsHorse ? TOTAL_STEPS : TOTAL_STEPS - 1;
+  };
+  
   const effectiveStep = getEffectiveStep();
-  const progress = (effectiveStep / TOTAL_STEPS) * 100;
+  const effectiveTotalSteps = getEffectiveTotalSteps();
+  const progress = (effectiveStep / effectiveTotalSteps) * 100;
 
   const handleBackToDashboard = () => {
     Alert.alert(
@@ -436,7 +443,7 @@ export default function OnboardingScreen() {
               showLabel={false}
               style={styles.progressBar}
             />
-            <Text style={styles.stepText}>Step {effectiveStep} of {TOTAL_STEPS}</Text>
+            <Text style={styles.stepText}>Step {effectiveStep} of {effectiveTotalSteps}</Text>
           </View>
 
           {/* Step 1: Experience Level */}
@@ -1041,7 +1048,7 @@ export default function OnboardingScreen() {
                 style={styles.backButton}
               />
             )}
-            {step < TOTAL_STEPS ? (
+            {(step < TOTAL_STEPS && !(step === 5 && !formData.ownsHorse)) ? (
               <Button
                 title="Next"
                 onPress={handleNext}
