@@ -1048,14 +1048,20 @@ export default function OnboardingScreen() {
                 style={styles.backButton}
               />
             )}
-            {(step < TOTAL_STEPS && !(step === 5 && !formData.ownsHorse)) ? (
-              <Button
-                title="Next"
-                onPress={handleNext}
-                style={styles.nextButton}
-                fullWidth={step === 1}
-              />
-            ) : (
+            {(() => {
+              // Check if we're on the final step
+              // If user owns horse: final step is 6 (TOTAL_STEPS)
+              // If user doesn't own horse: final step is 6 (step 5 is skipped)
+              const isFinalStep = step === 6 || (step === TOTAL_STEPS);
+              
+              return !isFinalStep ? (
+                <Button
+                  title="Next"
+                  onPress={handleNext}
+                  style={styles.nextButton}
+                  fullWidth={step === 1}
+                />
+              ) : (
               <View>
                 {planGenerationError && (
                   <View style={styles.errorContainer}>
@@ -1083,7 +1089,8 @@ export default function OnboardingScreen() {
                   fullWidth
                 />
               </View>
-            )}
+              );
+            })()}
           </View>
         </View>
       </ScrollView>
