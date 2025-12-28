@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +18,7 @@ import { API_URL } from './constants';
 import { colors, spacing, typography, borderRadius, shadows } from './theme';
 import { Button, ProgressBar } from '../components/ui';
 import Card from '../components/ui/Card';
+import { Input } from '../components/ui';
 
 const TOTAL_STEPS = 4;
 
@@ -86,6 +89,12 @@ const SESSION_LENGTH_OPTIONS = [
 ];
 
 const TEMPERAMENT_OPTIONS = ['calm', 'nervous', 'energetic', 'stubborn'];
+const SEX_OPTIONS = ['mare', 'stallion', 'gelding'];
+const ENERGY_LEVEL_OPTIONS = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 export default function OnboardingScreen() {
   const [step, setStep] = useState(1);
@@ -96,11 +105,19 @@ export default function OnboardingScreen() {
     daysPerWeek: 0,
     sessionLength: 0,
     ownsHorse: false,
-    horseDetails: '',
+    // Horse profile fields
     horseName: '',
     horseBreed: '',
     horseAge: '',
+    horseSex: '',
+    horseHeight: '',
+    horseWeight: '',
     horseTemperament: [] as string[],
+    horseEnergyLevel: '',
+    horseInjuries: '',
+    horseHealthConditions: '',
+    horsePastTrauma: '',
+    horseNotes: '',
   });
   const router = useRouter();
   const scaleAnim = useState(new Animated.Value(1))[0];
@@ -116,6 +133,10 @@ export default function OnboardingScreen() {
     }
     if (step === 3 && (!formData.daysPerWeek || !formData.sessionLength)) {
       Alert.alert('Please select', 'Please select your time commitment');
+      return;
+    }
+    if (step === 4 && formData.ownsHorse && !formData.horseName.trim()) {
+      Alert.alert('Horse name required', 'Please enter your horse\'s name');
       return;
     }
     if (step < TOTAL_STEPS) {
@@ -154,25 +175,18 @@ export default function OnboardingScreen() {
   };
 
   const handleSubmit = async () => {
+    // Validate horse name if ownsHorse is true
+    if (formData.ownsHorse && !formData.horseName.trim()) {
+      Alert.alert('Horse name required', 'Please enter your horse\'s name');
+      return;
+    }
+
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         router.replace('/(auth)/login');
         return;
-      }
-
-      // Build horse details string if horse info provided
-      let horseDetails = formData.horseDetails;
-      if (formData.ownsHorse && formData.horseName) {
-        const details: string[] = [];
-        if (formData.horseName) details.push(`Name: ${formData.horseName}`);
-        if (formData.horseBreed) details.push(`Breed: ${formData.horseBreed}`);
-        if (formData.horseAge) details.push(`Age: ${formData.horseAge}`);
-        if (formData.horseTemperament.length > 0) {
-          details.push(`Temperament: ${formData.horseTemperament.join(', ')}`);
-        }
-        horseDetails = details.join('. ') + (formData.horseDetails ? `. ${formData.horseDetails}` : '');
       }
 
       // Save profile
@@ -188,7 +202,7 @@ export default function OnboardingScreen() {
           daysPerWeek: formData.daysPerWeek,
           sessionLength: formData.sessionLength,
           ownsHorse: formData.ownsHorse,
-          horseDetails: horseDetails || undefined,
+          horseDetails: formData.ownsHorse && formData.horseName ? `${formData.horseName}` : undefined,
         }),
       });
 
@@ -196,12 +210,64 @@ export default function OnboardingScreen() {
         throw new Error('Failed to save profile');
       }
 
-      // Generate training plan
+      let horseId = null;
+
+      // Create horse profile if user owns a horse
+      if (formData.ownsHorse && formData.horseName.trim()) {
+        const horseData: any = {
+          name: formData.horseName.trim(),
+        };
+
+        if (formData.horseBreed.trim()) horseData.breed = formData.horseBreed.trim();
+        if (formData.horseAge.trim()) horseData.age = formData.horseAge.trim();
+        if (formData.horseSex) horseData.sex = formData.horseSex;
+        if (formData.horseHeight.trim()) horseData.height = formData.horseHeight.trim();
+        if (formData.horseWeight.trim()) {
+          const weight = parseFloat(formData.horseWeight.trim());
+          if (!isNaN(weight)) horseData.weight = weight;
+        }
+        if (formData.horseTemperament.length > 0) horseData.temperament = formData.horseTemperament;
+        if (formData.horseEnergyLevel) horseData.energyLevel = formData.horseEnergyLevel;
+        if (formData.horseNotes.trim()) horseData.notes = formData.horseNotes.trim();
+
+        // Parse safety-critical fields (comma-separated)
+        if (formData.horseInjuries.trim()) {
+          horseData.injuries = formData.horseInjuries.split(',').map(s => s.trim()).filter(s => s);
+        }
+        if (formData.horseHealthConditions.trim()) {
+          horseData.healthConditions = formData.horseHealthConditions.split(',').map(s => s.trim()).filter(s => s);
+        }
+        if (formData.horsePastTrauma.trim()) {
+          horseData.pastTrauma = formData.horsePastTrauma.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        const horseResponse = await fetch(`${API_URL}/api/horses`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(horseData),
+        });
+
+        if (!horseResponse.ok) {
+          throw new Error('Failed to create horse profile');
+        }
+
+        const horse = await horseResponse.json();
+        horseId = horse.id;
+      }
+
+      // Generate training plan with horse ID if available
       const planResponse = await fetch(`${API_URL}/api/training/generate-plan`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          ...(horseId && { horseIds: [horseId] }),
+        }),
       });
 
       if (!planResponse.ok) {
@@ -219,308 +285,428 @@ export default function OnboardingScreen() {
   const progress = (step / TOTAL_STEPS) * 100;
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <ProgressBar
-            progress={progress}
-            showLabel={false}
-            style={styles.progressBar}
-          />
-          <Text style={styles.stepText}>Step {step} of {TOTAL_STEPS}</Text>
-        </View>
-
-        {/* Step 1: Experience Level */}
-        {step === 1 && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>What's your experience level?</Text>
-            <Text style={styles.stepSubtitle}>
-              This helps us create the perfect starting point for you
-            </Text>
-
-            <View style={styles.optionsGrid}>
-              {EXPERIENCE_LEVELS.map((level) => (
-                <TouchableOpacity
-                  key={level.value}
-                  style={[
-                    styles.optionCard,
-                    formData.experienceLevel === level.value && styles.optionCardSelected,
-                  ]}
-                  onPress={() => {
-                    animateSelection();
-                    setFormData({ ...formData, experienceLevel: level.value });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.optionIcon}>{level.icon}</Text>
-                  <Text
-                    style={[
-                      styles.optionLabel,
-                      formData.experienceLevel === level.value && styles.optionLabelSelected,
-                    ]}
-                  >
-                    {level.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.optionDescription,
-                      formData.experienceLevel === level.value && styles.optionDescriptionSelected,
-                    ]}
-                  >
-                    {level.description}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.content}>
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <ProgressBar
+              progress={progress}
+              showLabel={false}
+              style={styles.progressBar}
+            />
+            <Text style={styles.stepText}>Step {step} of {TOTAL_STEPS}</Text>
           </View>
-        )}
 
-        {/* Step 2: Primary Goal */}
-        {step === 2 && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>What's your primary goal?</Text>
-            <Text style={styles.contextText}>
-              We'll tailor your plan to help you achieve this
-            </Text>
-
-            <View style={styles.optionsGrid}>
-              {PRIMARY_GOALS.map((goal) => (
-                <TouchableOpacity
-                  key={goal.value}
-                  style={[
-                    styles.optionCard,
-                    formData.primaryGoal === goal.value && styles.optionCardSelected,
-                  ]}
-                  onPress={() => {
-                    animateSelection();
-                    setFormData({ ...formData, primaryGoal: goal.value });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.optionIcon}>{goal.icon}</Text>
-                  <Text
-                    style={[
-                      styles.optionLabel,
-                      formData.primaryGoal === goal.value && styles.optionLabelSelected,
-                    ]}
-                  >
-                    {goal.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.optionDescription,
-                      formData.primaryGoal === goal.value && styles.optionDescriptionSelected,
-                    ]}
-                  >
-                    {goal.description}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Step 3: Time Commitment */}
-        {step === 3 && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>How much time can you commit?</Text>
-            <Text style={styles.helperText}>
-              Be realistic - we'll design lessons that fit your life
-            </Text>
-
-            <Card style={styles.timeCard}>
-              <Text style={styles.sectionLabel}>Days per week</Text>
-              <View style={styles.optionsRow}>
-                {DAYS_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.timeOption,
-                      formData.daysPerWeek === option.value && styles.timeOptionSelected,
-                    ]}
-                    onPress={() => {
-                      animateSelection();
-                      setFormData({ ...formData, daysPerWeek: option.value });
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.timeOptionText,
-                        formData.daysPerWeek === option.value && styles.timeOptionTextSelected,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>
-                Session length
+          {/* Step 1: Experience Level */}
+          {step === 1 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>What's your experience level?</Text>
+              <Text style={styles.stepSubtitle}>
+                This helps us create the perfect starting point for you
               </Text>
-              <View style={styles.optionsRow}>
-                {SESSION_LENGTH_OPTIONS.map((option) => (
+
+              <View style={styles.optionsGrid}>
+                {EXPERIENCE_LEVELS.map((level) => (
                   <TouchableOpacity
-                    key={option.value}
+                    key={level.value}
                     style={[
-                      styles.timeOption,
-                      formData.sessionLength === option.value && styles.timeOptionSelected,
+                      styles.optionCard,
+                      formData.experienceLevel === level.value && styles.optionCardSelected,
                     ]}
                     onPress={() => {
                       animateSelection();
-                      setFormData({ ...formData, sessionLength: option.value });
+                      setFormData({ ...formData, experienceLevel: level.value });
                     }}
                     activeOpacity={0.7}
                   >
+                    <Text style={styles.optionIcon}>{level.icon}</Text>
                     <Text
                       style={[
-                        styles.timeOptionText,
-                        formData.sessionLength === option.value && styles.timeOptionTextSelected,
+                        styles.optionLabel,
+                        formData.experienceLevel === level.value && styles.optionLabelSelected,
                       ]}
                     >
-                      {option.label}
+                      {level.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        formData.experienceLevel === level.value && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {level.description}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </Card>
-          </View>
-        )}
+            </View>
+          )}
 
-        {/* Step 4: Horse Details */}
-        {step === 4 && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Do you have a horse?</Text>
-            <Text style={styles.stepSubtitle}>
-              If not, we'll create lessons you can apply when you're ready
-            </Text>
+          {/* Step 2: Primary Goal */}
+          {step === 2 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>What's your primary goal?</Text>
+              <Text style={styles.contextText}>
+                We'll tailor your plan to help you achieve this
+              </Text>
 
-            <Card style={styles.horseCard}>
-              <TouchableOpacity
-                style={styles.toggleRow}
-                onPress={() => setFormData({ ...formData, ownsHorse: !formData.ownsHorse })}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.toggleLabel}>I own a horse</Text>
-                <View style={[styles.toggleSwitch, formData.ownsHorse && styles.toggleSwitchOn]}>
-                  <View
+              <View style={styles.optionsGrid}>
+                {PRIMARY_GOALS.map((goal) => (
+                  <TouchableOpacity
+                    key={goal.value}
                     style={[
-                      styles.toggleCircle,
-                      formData.ownsHorse && styles.toggleCircleOn,
+                      styles.optionCard,
+                      formData.primaryGoal === goal.value && styles.optionCardSelected,
                     ]}
-                  />
-                </View>
-              </TouchableOpacity>
+                    onPress={() => {
+                      animateSelection();
+                      setFormData({ ...formData, primaryGoal: goal.value });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.optionIcon}>{goal.icon}</Text>
+                    <Text
+                      style={[
+                        styles.optionLabel,
+                        formData.primaryGoal === goal.value && styles.optionLabelSelected,
+                      ]}
+                    >
+                      {goal.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        formData.primaryGoal === goal.value && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {goal.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
-              {formData.ownsHorse ? (
-                <View style={styles.horseForm}>
-                  <Text style={styles.formLabel}>Horse's Name</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="What's your horse's name?"
-                    value={formData.horseName}
-                    onChangeText={(text) => setFormData({ ...formData, horseName: text })}
-                    placeholderTextColor={colors.neutral[400]}
-                  />
+          {/* Step 3: Time Commitment */}
+          {step === 3 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>How much time can you commit?</Text>
+              <Text style={styles.helperText}>
+                Be realistic - we'll design lessons that fit your life
+              </Text>
 
-                  <Text style={styles.formLabel}>Breed (optional)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., Quarter Horse, Thoroughbred"
-                    value={formData.horseBreed}
-                    onChangeText={(text) => setFormData({ ...formData, horseBreed: text })}
-                    placeholderTextColor={colors.neutral[400]}
-                  />
-
-                  <Text style={styles.formLabel}>Age (optional)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Years"
-                    value={formData.horseAge}
-                    onChangeText={(text) => setFormData({ ...formData, horseAge: text.replace(/[^0-9]/g, '') })}
-                    keyboardType="number-pad"
-                    placeholderTextColor={colors.neutral[400]}
-                  />
-
-                  <Text style={styles.formLabel}>Temperament (optional)</Text>
-                  <View style={styles.temperamentGrid}>
-                    {TEMPERAMENT_OPTIONS.map((temp) => (
-                      <TouchableOpacity
-                        key={temp}
+              <Card style={styles.timeCard}>
+                <Text style={styles.sectionLabel}>Days per week</Text>
+                <View style={styles.optionsRow}>
+                  {DAYS_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.timeOption,
+                        formData.daysPerWeek === option.value && styles.timeOptionSelected,
+                      ]}
+                      onPress={() => {
+                        animateSelection();
+                        setFormData({ ...formData, daysPerWeek: option.value });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
                         style={[
-                          styles.temperamentChip,
-                          formData.horseTemperament.includes(temp) && styles.temperamentChipSelected,
+                          styles.timeOptionText,
+                          formData.daysPerWeek === option.value && styles.timeOptionTextSelected,
                         ]}
-                        onPress={() => toggleTemperament(temp)}
-                        activeOpacity={0.7}
                       >
-                        <Text
-                          style={[
-                            styles.temperamentChipText,
-                            formData.horseTemperament.includes(temp) && styles.temperamentChipTextSelected,
-                          ]}
-                        >
-                          {temp}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>
+                  Session length
+                </Text>
+                <View style={styles.optionsRow}>
+                  {SESSION_LENGTH_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.timeOption,
+                        formData.sessionLength === option.value && styles.timeOptionSelected,
+                      ]}
+                      onPress={() => {
+                        animateSelection();
+                        setFormData({ ...formData, sessionLength: option.value });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.timeOptionText,
+                          formData.sessionLength === option.value && styles.timeOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Card>
+            </View>
+          )}
+
+          {/* Step 4: Horse Details */}
+          {step === 4 && (
+            <View style={styles.stepContainer}>
+              <Text style={styles.stepTitle}>Do you have a horse?</Text>
+              <Text style={styles.stepSubtitle}>
+                Help us create a safer, more personalized training plan
+              </Text>
+
+              <Card style={styles.horseCard}>
+                <TouchableOpacity
+                  style={styles.toggleRow}
+                  onPress={() => setFormData({ ...formData, ownsHorse: !formData.ownsHorse })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.toggleLabel}>I own a horse</Text>
+                  <View style={[styles.toggleSwitch, formData.ownsHorse && styles.toggleSwitchOn]}>
+                    <View
+                      style={[
+                        styles.toggleCircle,
+                        formData.ownsHorse && styles.toggleCircleOn,
+                      ]}
+                    />
                   </View>
+                </TouchableOpacity>
 
-                  <Text style={styles.formLabel}>Additional Notes (optional)</Text>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Anything else we should know about your horse?"
-                    value={formData.horseDetails}
-                    onChangeText={(text) => setFormData({ ...formData, horseDetails: text })}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    placeholderTextColor={colors.neutral[400]}
-                  />
-                </View>
-              ) : (
-                <View style={styles.noHorseMessage}>
-                  <Text style={styles.noHorseIcon}>🐴</Text>
-                  <Text style={styles.noHorseText}>
-                    No problem! We'll create lessons you can apply when you're ready.
-                  </Text>
-                </View>
-              )}
-            </Card>
+                {formData.ownsHorse ? (
+                  <View style={styles.horseForm}>
+                    <Text style={styles.sectionHeader}>Basic Information</Text>
+                    
+                    <Input
+                      label="Horse's Name *"
+                      placeholder="What's your horse's name?"
+                      value={formData.horseName}
+                      onChangeText={(text) => setFormData({ ...formData, horseName: text })}
+                      containerStyle={styles.inputContainer}
+                    />
+
+                    <Input
+                      label="Breed"
+                      placeholder="e.g., Quarter Horse, Thoroughbred"
+                      value={formData.horseBreed}
+                      onChangeText={(text) => setFormData({ ...formData, horseBreed: text })}
+                      containerStyle={styles.inputContainer}
+                    />
+
+                    <View style={styles.row}>
+                      <Input
+                        label="Age"
+                        placeholder="Years"
+                        value={formData.horseAge}
+                        onChangeText={(text) => setFormData({ ...formData, horseAge: text.replace(/[^0-9]/g, '') })}
+                        keyboardType="number-pad"
+                        containerStyle={[styles.inputContainer, styles.halfWidth]}
+                      />
+
+                      <Input
+                        label="Sex"
+                        placeholder="Select"
+                        value={formData.horseSex}
+                        containerStyle={[styles.inputContainer, styles.halfWidth]}
+                        editable={false}
+                      />
+                    </View>
+
+                    <View style={styles.sexOptions}>
+                      {SEX_OPTIONS.map((sex) => (
+                        <TouchableOpacity
+                          key={sex}
+                          style={[
+                            styles.sexChip,
+                            formData.horseSex === sex && styles.sexChipSelected,
+                          ]}
+                          onPress={() => setFormData({ ...formData, horseSex: sex })}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.sexChipText,
+                              formData.horseSex === sex && styles.sexChipTextSelected,
+                            ]}
+                          >
+                            {sex.charAt(0).toUpperCase() + sex.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <View style={styles.row}>
+                      <Input
+                        label="Height"
+                        placeholder="e.g., 15.2 hands"
+                        value={formData.horseHeight}
+                        onChangeText={(text) => setFormData({ ...formData, horseHeight: text })}
+                        containerStyle={[styles.inputContainer, styles.halfWidth]}
+                      />
+
+                      <Input
+                        label="Weight (lbs)"
+                        placeholder="e.g., 1200"
+                        value={formData.horseWeight}
+                        onChangeText={(text) => setFormData({ ...formData, horseWeight: text.replace(/[^0-9]/g, '') })}
+                        keyboardType="number-pad"
+                        containerStyle={[styles.inputContainer, styles.halfWidth]}
+                      />
+                    </View>
+
+                    <Text style={styles.sectionHeader}>Temperament & Energy</Text>
+
+                    <Text style={styles.formLabel}>Temperament (select all that apply)</Text>
+                    <View style={styles.temperamentGrid}>
+                      {TEMPERAMENT_OPTIONS.map((temp) => (
+                        <TouchableOpacity
+                          key={temp}
+                          style={[
+                            styles.temperamentChip,
+                            formData.horseTemperament.includes(temp) && styles.temperamentChipSelected,
+                          ]}
+                          onPress={() => toggleTemperament(temp)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.temperamentChipText,
+                              formData.horseTemperament.includes(temp) && styles.temperamentChipTextSelected,
+                            ]}
+                          >
+                            {temp.charAt(0).toUpperCase() + temp.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <Text style={styles.formLabel}>Energy Level</Text>
+                    <View style={styles.energyLevelRow}>
+                      {ENERGY_LEVEL_OPTIONS.map((level) => (
+                        <TouchableOpacity
+                          key={level.value}
+                          style={[
+                            styles.energyLevelOption,
+                            formData.horseEnergyLevel === level.value && styles.energyLevelOptionSelected,
+                          ]}
+                          onPress={() => setFormData({ ...formData, horseEnergyLevel: level.value })}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.energyLevelText,
+                              formData.horseEnergyLevel === level.value && styles.energyLevelTextSelected,
+                            ]}
+                          >
+                            {level.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <Text style={styles.sectionHeader}>⚠️ Safety Information</Text>
+                    <Text style={styles.safetyNote}>
+                      Please share any injuries, health conditions, or past trauma. This helps us create safer training recommendations.
+                    </Text>
+
+                    <Input
+                      label="Injuries"
+                      placeholder="List any current or past injuries (comma-separated)"
+                      value={formData.horseInjuries}
+                      onChangeText={(text) => setFormData({ ...formData, horseInjuries: text })}
+                      containerStyle={styles.inputContainer}
+                      multiline
+                      numberOfLines={2}
+                    />
+
+                    <Input
+                      label="Health Conditions"
+                      placeholder="Any ongoing health conditions (comma-separated)"
+                      value={formData.horseHealthConditions}
+                      onChangeText={(text) => setFormData({ ...formData, horseHealthConditions: text })}
+                      containerStyle={styles.inputContainer}
+                      multiline
+                      numberOfLines={2}
+                    />
+
+                    <Input
+                      label="Past Trauma"
+                      placeholder="Any past traumatic experiences we should know about (comma-separated)"
+                      value={formData.horsePastTrauma}
+                      onChangeText={(text) => setFormData({ ...formData, horsePastTrauma: text })}
+                      containerStyle={styles.inputContainer}
+                      multiline
+                      numberOfLines={2}
+                    />
+
+                    <Text style={styles.sectionHeader}>Additional Notes</Text>
+                    <Input
+                      label="Notes"
+                      placeholder="Anything else we should know about your horse?"
+                      value={formData.horseNotes}
+                      onChangeText={(text) => setFormData({ ...formData, horseNotes: text })}
+                      containerStyle={styles.inputContainer}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.noHorseMessage}>
+                    <Text style={styles.noHorseIcon}>🐴</Text>
+                    <Text style={styles.noHorseText}>
+                      No problem! We'll create lessons you can apply when you're ready.
+                    </Text>
+                  </View>
+                )}
+              </Card>
+            </View>
+          )}
+
+          {/* Navigation Buttons */}
+          <View style={styles.buttonContainer}>
+            {step > 1 && (
+              <Button
+                title="Back"
+                onPress={handleBack}
+                variant="outline"
+                style={styles.backButton}
+              />
+            )}
+            {step < TOTAL_STEPS ? (
+              <Button
+                title="Next"
+                onPress={handleNext}
+                style={styles.nextButton}
+                fullWidth={step === 1}
+              />
+            ) : (
+              <Button
+                title={loading ? 'Generating Plan...' : 'Generate My Training Plan →'}
+                onPress={handleSubmit}
+                loading={loading}
+                style={styles.submitButton}
+                fullWidth
+              />
+            )}
           </View>
-        )}
-
-        {/* Navigation Buttons */}
-        <View style={styles.buttonContainer}>
-          {step > 1 && (
-            <Button
-              title="Back"
-              onPress={handleBack}
-              variant="outline"
-              style={styles.backButton}
-            />
-          )}
-          {step < TOTAL_STEPS ? (
-            <Button
-              title="Next"
-              onPress={handleNext}
-              style={styles.nextButton}
-              fullWidth={step === 1}
-            />
-          ) : (
-            <Button
-              title={loading ? 'Generating Plan...' : 'Generate My Training Plan →'}
-              onPress={handleSubmit}
-              loading={loading}
-              style={styles.submitButton}
-              fullWidth
-            />
-          )}
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -528,6 +714,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.neutral[50],
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     padding: spacing.lg,
@@ -684,6 +876,12 @@ const styles = StyleSheet.create({
   horseForm: {
     marginTop: spacing.md,
   },
+  sectionHeader: {
+    ...typography.h3,
+    color: colors.neutral[900],
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
   formLabel: {
     ...typography.bodySmall,
     fontWeight: '600',
@@ -691,29 +889,50 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     marginTop: spacing.md,
   },
-  input: {
-    ...typography.body,
-    color: colors.neutral[900],
-    backgroundColor: colors.neutral[50],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+  inputContainer: {
+    marginBottom: spacing.md,
   },
-  textArea: {
-    minHeight: 100,
-    paddingTop: spacing.md,
+  row: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  halfWidth: {
+    flex: 1,
+  },
+  sexOptions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sexChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: colors.neutral[300],
+    backgroundColor: colors.neutral[50],
+  },
+  sexChipSelected: {
+    backgroundColor: colors.primary[500],
+    borderColor: colors.primary[600],
+  },
+  sexChipText: {
+    ...typography.bodySmall,
+    color: colors.neutral[700],
+    textTransform: 'capitalize',
+  },
+  sexChipTextSelected: {
+    color: colors.neutral[50],
   },
   temperamentGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   temperamentChip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
     borderWidth: 2,
     borderColor: colors.neutral[300],
@@ -730,6 +949,41 @@ const styles = StyleSheet.create({
   },
   temperamentChipTextSelected: {
     color: colors.neutral[50],
+  },
+  energyLevelRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  energyLevelOption: {
+    flex: 1,
+    backgroundColor: colors.neutral[50],
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.neutral[200],
+    alignItems: 'center',
+  },
+  energyLevelOptionSelected: {
+    backgroundColor: colors.primary[500],
+    borderColor: colors.primary[600],
+  },
+  energyLevelText: {
+    ...typography.body,
+    fontWeight: '500',
+    color: colors.neutral[900],
+  },
+  energyLevelTextSelected: {
+    color: colors.neutral[50],
+  },
+  safetyNote: {
+    ...typography.bodySmall,
+    color: colors.warning,
+    marginBottom: spacing.md,
+    fontStyle: 'italic',
+    backgroundColor: colors.warning + '20',
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
   },
   noHorseMessage: {
     alignItems: 'center',
