@@ -847,7 +847,7 @@ export default function OnboardingScreen() {
           )}
 
           {/* Step 5/6: Horsemanship Method Selection */}
-          {((step === 5 && !formData.ownsHorse) || step === 6) && (
+          {step === 6 || (step === 5 && !formData.ownsHorse) ? (
             <View style={styles.stepContainer}>
               <Text style={styles.stepTitle}>What horsemanship approach interests you?</Text>
               <Text style={styles.stepSubtitle}>
