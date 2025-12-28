@@ -894,9 +894,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
   successButtons: {
     width: '100%',
     gap: spacing.md,
