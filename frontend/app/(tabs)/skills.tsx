@@ -10,6 +10,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { API_URL } from '../constants';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { EmptyState } from '../../components/ui';
+import Card from '../../components/ui/Card';
 
 interface Skill {
   id: string;
@@ -132,12 +135,13 @@ export default function SkillsScreen() {
             </View>
           ))
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No skills unlocked yet</Text>
-            <Text style={styles.emptySubtext}>
-              Complete lessons to unlock new skills!
-            </Text>
-          </View>
+          <EmptyState
+            icon="🏆"
+            title="Skills Await!"
+            description="Complete lessons to unlock skills and watch your abilities grow."
+            actionLabel="Start First Lesson"
+            onAction={() => router.push('/(tabs)/plan')}
+          />
         )}
       </View>
     </ScrollView>

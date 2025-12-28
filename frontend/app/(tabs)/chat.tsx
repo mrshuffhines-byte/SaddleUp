@@ -53,6 +53,7 @@ export default function ChatScreen() {
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; thumbnail?: string; type: 'photo' | 'video' } | null>(null);
@@ -152,6 +153,7 @@ export default function ChatScreen() {
     const messageText = message;
     setMessage('');
     setLoading(true);
+    setIsTyping(true);
 
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -182,6 +184,7 @@ export default function ChatScreen() {
       Alert.alert('Error', error.message || 'Failed to send message');
     } finally {
       setLoading(false);
+      setIsTyping(false);
     }
   };
 
@@ -369,45 +372,45 @@ export default function ChatScreen() {
           contentContainerStyle={styles.welcomeContainer}
         >
           <View style={styles.welcomeChat}>
-            <Text style={styles.welcomeTitle}>Ask the Trainer</Text>
-            <Text style={styles.welcomeText}>
-              Get answers to any horse training question. I know your experience level
-              and training goals, so I'll tailor my advice to you.
-            </Text>
-            
-            <Text style={styles.suggestionsTitle}>Try asking:</Text>
-            <View style={styles.suggestions}>
-              <SuggestionChip
-                text="How do I know if my horse is relaxed?"
-                onPress={() => {
-                  createNewConversation().then(() => {
-                    setMessage("How do I know if my horse is relaxed?");
-                  });
-                }}
-              />
-              <SuggestionChip
-                text="What should I do if my horse won't stand still?"
-                onPress={() => {
-                  createNewConversation().then(() => {
-                    setMessage("What should I do if my horse won't stand still?");
-                  });
-                }}
-              />
-              <SuggestionChip
-                text="How tight should my girth be?"
-                onPress={() => {
-                  createNewConversation().then(() => {
-                    setMessage("How tight should my girth be?");
-                  });
-                }}
-              />
+            <View style={styles.welcomeHeader}>
+              <Text style={styles.welcomeEmoji}>🤠</Text>
+              <Text style={styles.welcomeTitle}>Ask the Trainer</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Get answers to any horse training question. I know your experience level 
+                and goals, so I'll give you advice that fits your situation.
+              </Text>
             </View>
-            <Button
-              title="Start New Conversation"
-              onPress={createNewConversation}
-              style={styles.startButton}
-              fullWidth
-            />
+            
+            <View style={styles.suggestionsSection}>
+              <Text style={styles.suggestionsTitle}>Try asking:</Text>
+              <View style={styles.suggestions}>
+                {[
+                  "How do I know if my horse is relaxed?",
+                  "What should I do if my horse won't stand still?",
+                  "How tight should my girth be?",
+                  "My horse keeps walking off when I try to mount",
+                  "Is it safe to ride alone on trails?",
+                ].map((question, index) => (
+                  <SuggestionChip
+                    key={index}
+                    text={question}
+                    onPress={() => {
+                      createNewConversation().then(() => {
+                        setMessage(question);
+                      });
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.safetyNote}>
+              <Text style={styles.safetyNoteIcon}>💡</Text>
+              <Text style={styles.safetyNoteText}>
+                For emergencies or serious behavioral issues, always consult a 
+                professional trainer or veterinarian in person.
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -433,10 +436,14 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messagesList}
         inverted={false}
         ListFooterComponent={
-          loading ? (
+          isTyping ? (
             <View style={styles.typingIndicator}>
-              <Text style={styles.typingText}>Trainer is typing...</Text>
-              <ActivityIndicator size="small" color={colors.neutral[500]} />
+              <View style={styles.typingDots}>
+                <View style={[styles.dot, styles.dot1]} />
+                <View style={[styles.dot, styles.dot2]} />
+                <View style={[styles.dot, styles.dot3]} />
+              </View>
+              <Text style={styles.typingText}>Trainer is thinking...</Text>
             </View>
           ) : null
         }
@@ -513,30 +520,41 @@ const styles = StyleSheet.create({
   },
   welcomeChat: {
     alignItems: 'center',
+    maxWidth: 500,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  welcomeHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  welcomeEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.md,
   },
   welcomeTitle: {
-    ...typography.h1,
+    ...typography.h2,
     color: colors.neutral[900],
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
-  welcomeText: {
+  welcomeSubtitle: {
     ...typography.body,
     color: colors.neutral[600],
     textAlign: 'center',
-    marginBottom: spacing.xl,
     lineHeight: typography.body.lineHeight,
   },
+  suggestionsSection: {
+    width: '100%',
+    marginBottom: spacing.xl,
+  },
   suggestionsTitle: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.neutral[700],
+    ...typography.h4,
+    color: colors.neutral[800],
     marginBottom: spacing.md,
-    alignSelf: 'flex-start',
   },
   suggestions: {
     width: '100%',
-    marginBottom: spacing.xl,
     gap: spacing.sm,
   },
   suggestionChip: {
@@ -551,8 +569,55 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.neutral[700],
   },
-  startButton: {
-    marginTop: spacing.md,
+  safetyNote: {
+    flexDirection: 'row',
+    backgroundColor: colors.secondary[50],
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondary[500],
+    width: '100%',
+  },
+  safetyNoteIcon: {
+    fontSize: typography.body.fontSize,
+    marginRight: spacing.sm,
+  },
+  safetyNoteText: {
+    ...typography.bodySmall,
+    color: colors.secondary[800],
+    flex: 1,
+    lineHeight: typography.bodySmall.lineHeight,
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  typingDots: {
+    flexDirection: 'row',
+    marginRight: spacing.sm,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.neutral[400],
+    marginHorizontal: 2,
+  },
+  dot1: {
+    opacity: 0.4,
+  },
+  dot2: {
+    opacity: 0.6,
+  },
+  dot3: {
+    opacity: 0.8,
+  },
+  typingText: {
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    fontStyle: 'italic',
   },
   messagesList: {
     padding: spacing.lg,
@@ -639,7 +704,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    gap: spacing.sm,
+  },
+  typingDots: {
+    flexDirection: 'row',
+    marginRight: spacing.sm,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.neutral[400],
+    marginHorizontal: 2,
+  },
+  dot1: {
+    opacity: 0.4,
+  },
+  dot2: {
+    opacity: 0.6,
+  },
+  dot3: {
+    opacity: 0.8,
   },
   typingText: {
     ...typography.bodySmall,
