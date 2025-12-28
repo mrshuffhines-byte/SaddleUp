@@ -782,7 +782,7 @@ export default function OnboardingScreen() {
                 <Card style={styles.methodSelectionCard}>
                   <Text style={styles.sectionLabel}>
                     {formData.methodPreference === 'blend' 
-                      ? 'Select methods you're interested in (pick 2-4):'
+                      ? "Select methods you're interested in (pick 2-4):"
                       : 'Select your preferred method:'}
                   </Text>
                   
