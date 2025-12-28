@@ -17,6 +17,7 @@ import { API_URL } from '../constants';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import { Input, Button } from '../../components/ui';
 import Card from '../../components/ui/Card';
+import { ScreenBackground } from '../../components/ui';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -93,176 +94,228 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <ScreenBackground variant="warm">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          {/* Logo/Icon */}
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoIcon}>🐴</Text>
-          </View>
-
-          {/* Title and Tagline */}
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.tagline}>
-            Your Journey to Confident Horsemanship Starts Here
-          </Text>
-
-          <Card style={styles.formCard}>
-            <Input
-              label="Email"
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (errors.email) setErrors({ ...errors, email: undefined });
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              icon="📧"
-              error={errors.email}
-              containerStyle={styles.inputContainer}
-            />
-
-            <View style={styles.passwordContainer}>
-              <Input
-                label="Password"
-                placeholder="Enter your password"
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (errors.password) setErrors({ ...errors, password: undefined });
-                }}
-                secureTextEntry={!showPassword}
-                icon="🔒"
-                error={errors.password}
-                containerStyle={styles.inputContainer}
-                rightIcon={
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeButton}
-                  >
-                    <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
-                  </TouchableOpacity>
-                }
-              />
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+            {/* Header Section */}
+            <View style={styles.headerSection}>
+              <View style={styles.logoContainer}>
+                <Text style={styles.logoIcon}>🐴</Text>
+              </View>
+              <Text style={styles.title}>Welcome Back</Text>
+              <Text style={styles.tagline}>
+                Sign in to continue your horsemanship journey
+              </Text>
             </View>
 
-            <TouchableOpacity 
-              style={styles.forgotPasswordLink}
-              onPress={() => {
-                // TODO: Implement forgot password flow
-                Alert.alert('Forgot Password', 'Please contact support or try logging in again.');
-              }}
-            >
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
+            {/* Login Card */}
+            <Card style={styles.formCard} variant="elevated">
+              <View style={styles.formContent}>
+                <Input
+                  label="Email"
+                  placeholder="your.email@example.com"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (errors.email) setErrors({ ...errors, email: undefined });
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect={false}
+                  error={errors.email}
+                  containerStyle={styles.inputContainer}
+                  style={styles.input}
+                />
 
-            <Button
-              title="Sign In"
-              onPress={handleLogin}
-              loading={loading}
-              style={styles.button}
-              fullWidth
-            />
-          </Card>
+                <View style={styles.passwordContainer}>
+                  <Input
+                    label="Password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (errors.password) setErrors({ ...errors, password: undefined });
+                    }}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoComplete="password"
+                    autoCorrect={false}
+                    error={errors.password}
+                    containerStyle={styles.inputContainer}
+                    style={styles.input}
+                    rightIcon={
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                      </TouchableOpacity>
+                    }
+                  />
+                </View>
 
-          {/* Signup Link */}
-          <View style={styles.signupContainer}>
-            <Text style={styles.signupText}>New to horse training? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-              <Text style={styles.signupLink}>Create an account →</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+                <TouchableOpacity 
+                  style={styles.forgotPasswordLink}
+                  onPress={() => {
+                    Alert.alert('Forgot Password', 'Please contact support or try logging in again.');
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
+
+                <Button
+                  title="Sign In"
+                  onPress={handleLogin}
+                  loading={loading}
+                  disabled={loading || !email || !password}
+                  size="lg"
+                  style={styles.signInButton}
+                  fullWidth
+                />
+              </View>
+            </Card>
+
+            {/* Signup CTA */}
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>New to SaddleUp? </Text>
+              <TouchableOpacity 
+                onPress={() => router.push('/(auth)/signup')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.signupLink}>Create an account</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary[50],
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.lg,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
   },
   content: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 440,
     alignSelf: 'center',
+  },
+  // Header Section - Improved hierarchy
+  headerSection: {
+    marginBottom: spacing.xl,
+    alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
   logoIcon: {
-    fontSize: 64,
+    fontSize: 72,
   },
   title: {
     ...typography.h1,
+    fontSize: 36,
+    fontWeight: '700',
     color: colors.neutral[900],
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
+    letterSpacing: -0.8,
   },
   tagline: {
     ...typography.body,
+    fontSize: 17,
     color: colors.neutral[600],
     textAlign: 'center',
-    marginBottom: spacing.xl,
-    lineHeight: typography.body.lineHeight,
+    lineHeight: 24,
   },
+  // Login Card - Enhanced with better spacing and shadow
   formCard: {
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    padding: spacing.xl + spacing.md, // Increased from lg to xl + md
+    marginBottom: spacing.xl,
+    borderRadius: borderRadius.xl,
+    backgroundColor: colors.surface,
+  },
+  formContent: {
+    width: '100%',
   },
   inputContainer: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg, // Increased from md to lg
+  },
+  input: {
+    fontSize: 16, // Ensure minimum 16px for readability
+    paddingVertical: spacing.md + 2, // Slightly increased for better tap target
+    minHeight: 52, // WCAG AA minimum tap target size
   },
   passwordContainer: {
     position: 'relative',
   },
   eyeButton: {
-    padding: spacing.xs,
+    padding: spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   eyeIconText: {
-    fontSize: 20,
+    fontSize: 22,
+    opacity: 0.7,
   },
-  button: {
-    marginTop: spacing.md,
+  // Primary Button - More confident and tappable
+  signInButton: {
+    marginTop: spacing.lg,
+    minHeight: 56, // Large tap target
+    paddingVertical: spacing.md + 6,
   },
+  // Forgot Password - More visible but not distracting
   forgotPasswordLink: {
     marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     alignItems: 'flex-end',
+    alignSelf: 'flex-end',
   },
   forgotPasswordText: {
     ...typography.bodySmall,
+    fontSize: 15,
     color: colors.primary[600],
-    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
+  // Signup CTA - More inviting
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.lg,
+    flexWrap: 'wrap',
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.md,
   },
   signupText: {
     ...typography.body,
+    fontSize: 16,
     color: colors.neutral[600],
   },
   signupLink: {
     ...typography.body,
-    color: colors.primary[600],
+    fontSize: 16,
+    color: colors.primary[700],
     fontWeight: '600',
   },
 });

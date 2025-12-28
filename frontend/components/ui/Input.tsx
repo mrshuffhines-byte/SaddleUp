@@ -26,7 +26,7 @@ export default function Input({
         {icon && <Text style={styles.icon}>{icon}</Text>}
         <TextInput
           style={[styles.input, icon && styles.inputWithIcon, rightIcon && styles.inputWithRightIcon, style]}
-          placeholderTextColor={colors.neutral[400]}
+          placeholderTextColor={colors.neutral[500]}
           {...props}
         />
         {rightIcon && (
@@ -46,21 +46,25 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.bodySmall,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.neutral[700],
-    marginBottom: spacing.xs,
+    color: colors.neutral[800],
+    marginBottom: spacing.sm,
+    letterSpacing: 0.1,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.neutral[50],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.neutral[300],
+    borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
+    minHeight: 52, // WCAG AA minimum tap target
   },
   inputError: {
     borderColor: colors.error,
+    borderWidth: 1.5,
   },
   icon: {
     marginRight: spacing.sm,
@@ -69,8 +73,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     ...typography.body,
+    fontSize: 16, // Ensure minimum 16px for readability and prevents zoom on iOS
     color: colors.neutral[900],
     paddingVertical: spacing.md,
+    minHeight: 48, // Better tap target
   },
   inputWithIcon: {
     paddingLeft: 0,

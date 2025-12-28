@@ -103,8 +103,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   sizeLg: {
-    paddingVertical: spacing.md + 4,
+    paddingVertical: spacing.md + 6,
     paddingHorizontal: spacing.xl,
+    minHeight: 56, // Large tap target for primary actions
   },
   fullWidth: {
     width: '100%',
