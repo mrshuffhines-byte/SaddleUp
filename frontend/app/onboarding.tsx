@@ -219,21 +219,6 @@ export default function OnboardingScreen() {
     });
   };
 
-  const animateSelection = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
   const handleSubmit = async () => {
     // Validate horse name if ownsHorse is true
     if (formData.ownsHorse && !formData.horseName.trim()) {
