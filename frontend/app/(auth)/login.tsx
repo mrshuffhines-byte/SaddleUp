@@ -61,6 +61,9 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      // Log API URL for debugging (remove in production if needed)
+      console.log('Attempting login with API URL:', API_URL);
+      
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +71,7 @@ export default function LoginScreen() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ error: 'Network error' }));
         throw new Error(error.error || 'Login failed');
       }
 
@@ -82,11 +85,26 @@ export default function LoginScreen() {
         router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Login failed. Please try again.');
-      if (error.message.toLowerCase().includes('password')) {
-        setErrors({ password: error.message });
-      } else if (error.message.toLowerCase().includes('email')) {
-        setErrors({ email: error.message });
+      console.error('Login error:', error);
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection and ensure the backend is running.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+      
+      if (errorMessage.toLowerCase().includes('password')) {
+        setErrors({ password: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('email')) {
+        setErrors({ email: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('connect') || errorMessage.toLowerCase().includes('server')) {
+        // Network error - could show a more helpful message
+        console.warn('Backend connection issue. API_URL:', API_URL);
       }
     } finally {
       setLoading(false);
