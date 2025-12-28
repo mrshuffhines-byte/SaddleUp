@@ -812,12 +812,15 @@ export default function OnboardingScreen() {
                   
                   {loadingMethods ? (
                     <ActivityIndicator size="large" color={colors.primary[500]} style={styles.loadingSpinner} />
+                  ) : methods.length === 0 ? (
+                    <Text style={styles.errorText}>No methods available. Please try again later.</Text>
                   ) : (
                     <View style={styles.methodsByCategory}>
                       {Object.entries(
                         methods.reduce((acc: any, method: any) => {
-                          if (!acc[method.category]) acc[method.category] = [];
-                          acc[method.category].push(method);
+                          const category = method.category || 'Other';
+                          if (!acc[category]) acc[category] = [];
+                          acc[category].push(method);
                           return acc;
                         }, {})
                       ).map(([category, categoryMethods]: [string, any]) => (
@@ -874,7 +877,8 @@ export default function OnboardingScreen() {
                             })}
                           </View>
                         </View>
-                      ))}
+                      ))
+                    )}
                     </View>
                   )}
                 </Card>
