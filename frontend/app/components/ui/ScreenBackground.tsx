@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../theme';
+import { colors } from '../../theme';
 
 interface ScreenBackgroundProps {
   children: React.ReactNode;
