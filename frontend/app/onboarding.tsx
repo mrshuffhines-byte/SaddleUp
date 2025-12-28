@@ -441,10 +441,7 @@ export default function OnboardingScreen() {
                         styles.timeOption,
                         formData.daysPerWeek === option.value && styles.timeOptionSelected,
                       ]}
-                      onPress={() => {
-                        animateSelection();
-                        setFormData({ ...formData, daysPerWeek: option.value });
-                      }}
+                      onPress={() => setFormData({ ...formData, daysPerWeek: option.value })}
                       activeOpacity={0.7}
                     >
                       <Text
@@ -470,10 +467,7 @@ export default function OnboardingScreen() {
                         styles.timeOption,
                         formData.sessionLength === option.value && styles.timeOptionSelected,
                       ]}
-                      onPress={() => {
-                        animateSelection();
-                        setFormData({ ...formData, sessionLength: option.value });
-                      }}
+                      onPress={() => setFormData({ ...formData, sessionLength: option.value })}
                       activeOpacity={0.7}
                     >
                       <Text
