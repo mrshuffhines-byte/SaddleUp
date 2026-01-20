@@ -13,7 +13,7 @@ export default function AuthLayout() {
         },
       }}
     >
-      <Stack.Screen name="login" options={{ title: 'Welcome to SaddleUp' }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ title: 'Create Account' }} />
     </Stack>
   );

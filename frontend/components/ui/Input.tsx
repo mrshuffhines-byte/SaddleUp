@@ -26,7 +26,7 @@ export default function Input({
         {icon && <Text style={styles.icon}>{icon}</Text>}
         <TextInput
           style={[styles.input, icon && styles.inputWithIcon, rightIcon && styles.inputWithRightIcon, style]}
-          placeholderTextColor={colors.neutral[500]} // Improved contrast for better visibility
+          placeholderTextColor={colors.midGray} // Design system: mid-gray for placeholder text
           {...props}
         />
         {rightIcon && (
@@ -45,26 +45,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   label: {
-    ...typography.bodySmall,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.neutral[900], // Darker for better contrast (WCAG AA)
+    ...typography.label,
+    color: colors.deepInk, // Design system: deep ink for labels
     marginBottom: spacing.sm,
-    letterSpacing: 0.2, // Slightly increased for clarity
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 2, // Increased from 1.5 for better definition
-    borderColor: colors.neutral[300],
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    minHeight: 56, // Increased from 52 for better tap target (WCAG AA)
+    backgroundColor: colors.offWhite, // Design system: off-white background
+    borderWidth: 1,
+    borderColor: colors.borderWarm, // Design system: border-warm for borders
+    borderRadius: borderRadius.md, // Design system: 12px for inputs
+    paddingHorizontal: spacing.base, // Design system: 16px padding
+    minHeight: 44, // Design system: minimum 44px tap target
   },
   inputError: {
     borderColor: colors.error,
-    borderWidth: 2, // Increased from 1.5 for consistency
+    borderWidth: 1,
   },
   icon: {
     marginRight: spacing.sm,
@@ -74,10 +71,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     ...typography.body,
-    fontSize: 16, // Minimum 16px for readability and prevents zoom on iOS
-    color: colors.neutral[900],
-    paddingVertical: spacing.md + 2, // Slightly increased for better comfort
-    minHeight: 52, // Better tap target
+    fontSize: 16, // Design system: 16px body text
+    color: colors.deepInk,
+    paddingVertical: spacing.base, // Design system: 16px padding
   },
   inputWithIcon: {
     paddingLeft: 0,

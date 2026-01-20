@@ -49,8 +49,8 @@ export default function Card({
 
 const styles = StyleSheet.create({
   base: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white, // Design system: white for card surfaces
+    borderRadius: borderRadius.lg, // Design system: 16px for cards
     overflow: 'hidden',
   },
   padding: {
@@ -60,18 +60,18 @@ const styles = StyleSheet.create({
     ...shadows.lg,
   },
   selected: {
-    backgroundColor: colors.primary[500],
-    borderWidth: 2,
-    borderColor: colors.primary[600],
-    ...shadows.glow,
+    backgroundColor: colors.deepInk,
+    borderWidth: 1,
+    borderColor: colors.deepInk,
+    ...shadows.lg,
   },
   interactive: {
-    borderWidth: 2,
-    borderColor: colors.primary[100],
+    borderWidth: 1,
+    borderColor: colors.borderWarm,
   },
   outlined: {
     borderWidth: 1,
-    borderColor: colors.neutral[200],
+    borderColor: colors.borderWarm, // Design system: border-warm for card borders
     ...shadows.sm,
     shadowOpacity: 0,
     elevation: 0,

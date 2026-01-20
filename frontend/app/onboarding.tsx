@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, { 
   useSharedValue, 
@@ -21,6 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
 import { API_URL } from './constants';
 import { colors, spacing, typography, borderRadius, shadows } from './theme';
 import { Button, ProgressBar, ScreenBackground } from '../components/ui';
@@ -34,25 +36,29 @@ const EXPERIENCE_LEVELS = [
     value: 'complete_beginner',
     label: 'Complete Beginner',
     icon: '🌱',
-    description: 'Brand new to horses',
+    description: 'Brand new to horses—let\'s start with the basics',
+    recommended: false,
   },
   {
     value: 'some_experience',
     label: 'Some Experience',
     icon: '🐴',
-    description: 'Ridden a few times',
+    description: 'Ridden a few times, learning the fundamentals',
+    recommended: true,
   },
   {
     value: 'returning_rider',
     label: 'Returning Rider',
     icon: '🔄',
-    description: 'Getting back into it',
+    description: 'Getting back into it after time away',
+    recommended: false,
   },
   {
     value: 'experienced',
     label: 'Experienced',
     icon: '⭐',
-    description: 'Confident with basics',
+    description: 'Confident with basics, ready to advance skills',
+    recommended: false,
   },
 ];
 
@@ -414,20 +420,73 @@ export default function OnboardingScreen() {
     );
   };
 
+  const { width } = useWindowDimensions();
+
   return (
     <ScreenBackground variant="default">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        {/* Header with Back Button */}
+        {/* Header */}
         <View style={styles.headerContainer}>
-          <TouchableOpacity
-            style={styles.headerBackButton}
-            onPress={handleBackToDashboard}
-          >
-            <Text style={styles.headerBackButtonText}>← Dashboard</Text>
-          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <TouchableOpacity
+              style={styles.headerBackButton}
+              onPress={handleBackToDashboard}
+            >
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.slate} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <Path d="M19 12H5M12 19l-7-7 7-7" />
+              </Svg>
+              <Text style={styles.headerBackButtonText}>Back</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.headerLogo}>
+              <Svg width={32} height={32} viewBox="0 0 56 56" fill="none">
+                <Path
+                  d="M28 8C17 8 10 16 10 26C10 32 12 37 16 40C16 40 18 42 18 44C18 46 16 48 16 48"
+                  stroke={colors.deepInk}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                <Path
+                  d="M28 8C39 8 46 16 46 26C46 36 40 44 32 46"
+                  stroke={colors.deepInk}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                <Circle cx={32} cy={46} r="2" fill={colors.turquoise} />
+              </Svg>
+              {width >= 640 && <Text style={styles.headerLogoText}>Rein</Text>}
+            </View>
+            
+            {step === 1 && (
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={() => router.replace('/(tabs)/dashboard')}
+              >
+                <Text style={styles.skipButtonText}>Skip for now</Text>
+              </TouchableOpacity>
+            )}
+            {step !== 1 && <View style={styles.skipButton} />}
+          </View>
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarInner}>
+            <View style={styles.progressBarHeader}>
+              <Text style={styles.progressBarLabel}>Building your plan</Text>
+              <Text style={styles.progressBarStep}>
+                <Text style={styles.progressBarStepBold}>Step {effectiveStep}</Text> of {effectiveTotalSteps}
+              </Text>
+            </View>
+            <View style={styles.progressBarTrack}>
+              <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+            </View>
+          </View>
         </View>
         
         <ScrollView
@@ -436,29 +495,21 @@ export default function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
         >
         <View style={styles.content}>
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <ProgressBar
-              progress={progress}
-              showLabel={false}
-              style={styles.progressBar}
-            />
-            <Text style={styles.stepText}>Step {effectiveStep} of {effectiveTotalSteps}</Text>
-          </View>
-
           {/* Step 1: Experience Level */}
           {step === 1 && (
             <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>What's your experience level?</Text>
-              <Text style={styles.stepSubtitle}>
-                This helps us create the perfect starting point for you
-              </Text>
+              <View style={styles.questionHeader}>
+                <Text style={styles.questionTitle}>What's your experience level?</Text>
+                <Text style={styles.questionSubtitle}>
+                  This helps us create the perfect starting point for you
+                </Text>
+              </View>
 
               <View style={styles.optionsGrid}>
                 {EXPERIENCE_LEVELS.map((level) => {
                   const isSelected = formData.experienceLevel === level.value;
                   return (
-                    <OptionCard
+                    <Step1OptionCard
                       key={level.value}
                       option={level}
                       isSelected={isSelected}
@@ -466,6 +517,17 @@ export default function OnboardingScreen() {
                     />
                   );
                 })}
+              </View>
+
+              {/* Helper Text */}
+              <View style={styles.helperTextContainer}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.turquoise} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={styles.helperIcon}>
+                  <Circle cx="12" cy="12" r="10" />
+                  <Path d="M12 16v-4M12 8h.01" />
+                </Svg>
+                <Text style={styles.helperTextContent}>
+                  <Text style={styles.helperTextBold}>No wrong answer here.</Text> You can adjust your level anytime in settings. We'll tailor every lesson to match where you are.
+                </Text>
               </View>
 
               {/* Returning Rider Time Gap Follow-up */}
@@ -1038,64 +1100,140 @@ export default function OnboardingScreen() {
             </View>
           )}
 
-          {/* Navigation Buttons */}
-          <View style={styles.buttonContainer}>
-            {step > 1 && (
-              <Button
-                title="Back"
-                onPress={handleBack}
-                variant="outline"
-                style={styles.backButton}
-              />
-            )}
-            {(() => {
-              // Check if we're on the final step
-              // Use the same condition as the method selection step render
-              // Method selection is shown when: step === 6 OR (step === 5 && !ownsHorse)
-              const isFinalStep = step === 6 || (step === 5 && !formData.ownsHorse);
-              
-              return !isFinalStep ? (
+          {/* Navigation Buttons - For other steps */}
+          {step !== 1 && (
+            <View style={styles.buttonContainer}>
+              {step > 1 && (
                 <Button
-                  title="Next"
-                  onPress={handleNext}
-                  style={styles.nextButton}
-                  fullWidth={step === 1}
+                  title="Back"
+                  onPress={handleBack}
+                  variant="outline"
+                  style={styles.backButton}
                 />
-              ) : (
-              <View>
-                {planGenerationError && (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{planGenerationError}</Text>
-                    <Button
-                      title="Try Again"
-                      onPress={() => handleSubmit(true)}
-                      variant="outline"
-                      style={styles.retryButton}
-                    />
-                  </View>
-                )}
-                {loading && loadingMessage && (
-                  <View style={styles.loadingMessageContainer}>
-                    <ActivityIndicator size="small" color={colors.primary[500]} style={{ marginRight: spacing.sm }} />
-                    <Text style={styles.loadingMessageText}>{loadingMessage}</Text>
-                  </View>
-                )}
-                <Button
-                  title={loading ? 'Creating Your Plan...' : 'Generate My Training Plan →'}
-                  onPress={() => handleSubmit(false)}
-                  loading={loading}
-                  disabled={loading}
-                  style={styles.submitButton}
-                  fullWidth
-                />
-              </View>
-              );
-            })()}
-          </View>
+              )}
+              {(() => {
+                // Check if we're on the final step
+                // Use the same condition as the method selection step render
+                // Method selection is shown when: step === 6 OR (step === 5 && !ownsHorse)
+                const isFinalStep = step === 6 || (step === 5 && !formData.ownsHorse);
+                
+                return !isFinalStep ? (
+                  <Button
+                    title="Next"
+                    onPress={handleNext}
+                    style={styles.nextButton}
+                    fullWidth={step === 1}
+                  />
+                ) : (
+                <View>
+                  {planGenerationError && (
+                    <View style={styles.errorContainer}>
+                      <Text style={styles.errorText}>{planGenerationError}</Text>
+                      <Button
+                        title="Try Again"
+                        onPress={() => handleSubmit(true)}
+                        variant="outline"
+                        style={styles.retryButton}
+                      />
+                    </View>
+                  )}
+                  {loading && loadingMessage && (
+                    <View style={styles.loadingMessageContainer}>
+                      <ActivityIndicator size="small" color={colors.primary[500]} style={{ marginRight: spacing.sm }} />
+                      <Text style={styles.loadingMessageText}>{loadingMessage}</Text>
+                    </View>
+                  )}
+                  <Button
+                    title={loading ? 'Creating Your Plan...' : 'Generate My Training Plan →'}
+                    onPress={() => handleSubmit(false)}
+                    loading={loading}
+                    disabled={loading}
+                    style={styles.submitButton}
+                    fullWidth
+                  />
+                </View>
+                );
+              })()}
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      {/* Footer - Only show footer for Step 1 */}
+      {step === 1 && (
+        <View style={styles.footerContainer}>
+          <View style={styles.footerContent}>
+            <TouchableOpacity
+              style={styles.footerBackButton}
+              onPress={handleBackToDashboard}
+            >
+              <Text style={styles.footerBackButtonText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.footerNextButton,
+                !formData.experienceLevel && styles.footerNextButtonDisabled,
+              ]}
+              onPress={handleNext}
+              disabled={!formData.experienceLevel}
+            >
+              <Text style={[
+                styles.footerNextButtonText,
+                !formData.experienceLevel && styles.footerNextButtonTextDisabled,
+              ]}>Next</Text>
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={!formData.experienceLevel ? colors.midGray : colors.offWhite} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <Path d="M5 12h14M12 5l7 7-7 7" />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
     </ScreenBackground>
+  );
+}
+
+// Step 1 Option Card Component
+function Step1OptionCard({ 
+  option, 
+  isSelected, 
+  onSelect 
+}: { 
+  option: { value: string; label: string; icon: string; description: string; recommended?: boolean }; 
+  isSelected: boolean; 
+  onSelect: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onSelect}
+      style={({ pressed }) => [
+        styles.step1OptionCard,
+        isSelected && styles.step1OptionCardSelected,
+        pressed && styles.step1OptionCardPressed,
+      ]}
+    >
+      {option.recommended && (
+        <View style={styles.recommendedBadge}>
+          <Text style={styles.recommendedBadgeText}>Most common</Text>
+        </View>
+      )}
+      <View style={[
+        styles.step1OptionRadio,
+        isSelected && styles.step1OptionRadioSelected,
+      ]}>
+        {isSelected && <View style={styles.step1OptionRadioDot} />}
+      </View>
+      <View style={[
+        styles.step1OptionIcon,
+        isSelected && styles.step1OptionIconSelected,
+      ]}>
+        <Text style={styles.step1OptionIconText}>{option.icon}</Text>
+      </View>
+      <View style={styles.step1OptionContent}>
+        <Text style={styles.step1OptionTitle}>{option.label}</Text>
+        <Text style={styles.step1OptionDescription}>{option.description}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -1178,24 +1316,100 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderWarm,
+    paddingVertical: spacing.base,
+    paddingHorizontal: spacing.xl,
+  },
+  headerContent: {
+    maxWidth: 800,
+    width: '100%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerBackButton: {
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'transparent',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.neutral[100],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+    borderRadius: borderRadius.sm,
   },
   headerBackButtonText: {
-    ...typography.body,
-    color: colors.primary[700],
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.slate,
+  },
+  headerLogo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerLogoText: {
+    fontSize: 18,
     fontWeight: '600',
+    color: colors.deepInk,
+    fontFamily: Platform.OS === 'web' ? 'Fraunces, Georgia, serif' : undefined,
+  },
+  skipButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.midGray,
+    
+  },
+  progressBarContainer: {
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderWarm,
+    paddingVertical: spacing.base,
+    paddingHorizontal: spacing.xl,
+  },
+  progressBarInner: {
+    maxWidth: 800,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  progressBarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  progressBarLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.slate,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  progressBarStep: {
+    fontSize: 14,
+    color: colors.midGray,
+    fontWeight: '500',
+  },
+  progressBarStepBold: {
+    fontWeight: '600',
+    color: colors.deepInk,
+  },
+  progressBarTrack: {
+    height: 4,
+    backgroundColor: colors.borderWarm,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.turquoise,
+    borderRadius: 2,
   },
   scrollView: {
     flex: 1,
@@ -1204,8 +1418,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   content: {
-    padding: spacing.lg,
+    padding: spacing['3xl'],
     paddingBottom: spacing.xl,
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
   },
   progressContainer: {
     marginBottom: spacing.xl,
@@ -1220,6 +1437,24 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     marginBottom: spacing.xl,
+  },
+  questionHeader: {
+    alignItems: 'center',
+    marginBottom: spacing['3xl'],
+  },
+  questionTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.deepInk,
+    marginBottom: spacing.md,
+    lineHeight: 36,
+    textAlign: 'center',
+  },
+  questionSubtitle: {
+    fontSize: 16,
+    color: colors.slate,
+    lineHeight: 24,
+    textAlign: 'center',
   },
   stepTitle: {
     ...typography.h1,
@@ -1247,6 +1482,169 @@ const styles = StyleSheet.create({
   },
   optionsGrid: {
     gap: spacing.md,
+  },
+  step1OptionCard: {
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.borderWarm,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    paddingVertical: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    position: 'relative',
+    minHeight: 88,
+  },
+  step1OptionCardPressed: {
+    transform: [{ translateY: -1 }],
+  },
+  step1OptionCardSelected: {
+    borderColor: colors.deepInk,
+    backgroundColor: colors.bone,
+    ...shadows.sm,
+  },
+  recommendedBadge: {
+    position: 'absolute',
+    top: -10,
+    right: spacing.base,
+    backgroundColor: colors.turquoise,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 4,
+  },
+  recommendedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.deepInk,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  step1OptionRadio: {
+    width: 24,
+    height: 24,
+    minWidth: 24,
+    borderWidth: 2,
+    borderColor: colors.borderWarm,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  step1OptionRadioSelected: {
+    borderColor: colors.deepInk,
+    backgroundColor: colors.deepInk,
+  },
+  step1OptionRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.offWhite,
+  },
+  step1OptionIcon: {
+    width: 48,
+    height: 48,
+    minWidth: 48,
+    backgroundColor: colors.surfaceWarm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  step1OptionIconSelected: {
+    backgroundColor: colors.warmSand,
+  },
+  step1OptionIconText: {
+    fontSize: 24,
+  },
+  step1OptionContent: {
+    flex: 1,
+  },
+  step1OptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.deepInk,
+    marginBottom: spacing.xs,
+    lineHeight: 22,
+  },
+  step1OptionDescription: {
+    fontSize: 14,
+    color: colors.slate,
+    lineHeight: 20,
+  },
+  helperTextContainer: {
+    marginTop: spacing.xl,
+    padding: spacing.base,
+    backgroundColor: colors.bone,
+    borderRadius: borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  helperIcon: {
+    marginTop: 2,
+  },
+  helperTextContent: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.slate,
+    lineHeight: 20,
+  },
+  helperTextBold: {
+    fontWeight: '600',
+    color: colors.deepInk,
+  },
+  footerContainer: {
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderWarm,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+  },
+  footerContent: {
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  footerBackButton: {
+    flex: 0,
+    paddingVertical: spacing.base,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.borderWarm,
+    borderRadius: borderRadius.md,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerBackButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.slate,
+  },
+  footerNextButton: {
+    flex: 1,
+    paddingVertical: spacing.base,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.deepInk,
+    borderRadius: borderRadius.md,
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  footerNextButtonDisabled: {
+    backgroundColor: colors.borderWarm,
+  },
+  footerNextButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.offWhite,
+  },
+  footerNextButtonTextDisabled: {
+    color: colors.midGray,
   },
   optionCard: {
     borderRadius: borderRadius.lg,

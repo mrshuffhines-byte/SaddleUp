@@ -15,7 +15,7 @@ export function ScreenBackground({ children, variant = 'default' }: ScreenBackgr
   
   return (
     <LinearGradient
-      colors={variant === 'warm' ? ['#fdf3d0', '#f0e6d9'] : ['#faf6f1', '#f0e6d9']}
+      colors={variant === 'warm' ? [colors.surfaceWarm, colors.warmSand] : [colors.offWhite, colors.surfaceWarm]}
       style={styles.gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   },
   plain: {
     flex: 1,
-    backgroundColor: colors.primary[50],
+    backgroundColor: colors.offWhite, // Design system: off-white for plain backgrounds
   },
 });
 

@@ -42,8 +42,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: 'Ask Trainer',
-          tabBarLabel: 'Ask Trainer',
+          title: 'Coach',
+          tabBarLabel: 'Coach',
         }}
       />
       <Tabs.Screen

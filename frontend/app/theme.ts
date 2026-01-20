@@ -1,121 +1,156 @@
+/**
+ * Design System Colors
+ * Based on warm, modern equestrian aesthetic
+ */
 export const colors = {
-  // Primary - Richer, warmer browns
+  // Primary - Deep Ink (main CTA, primary text)
+  deepInk: '#12161C',
+  // Brand Colors
+  saddleBrown: '#6B4A2D',
+  warmSand: '#E7DDCF',
+  bone: '#F6F1E8', // Elevated surfaces
+  prairieSage: '#7C8A7A',
+  // Neutral Grays
+  slate: '#3A4652', // Secondary text
+  midGray: '#8B949E', // Placeholder text
+  // Backgrounds
+  white: '#FFFFFF', // Surface
+  offWhite: '#FAF7F2', // Background
+  surfaceWarm: '#F2EADF',
+  // Borders
+  borderWarm: '#E3D7C7',
+  // Accent Colors (use sparingly)
+  turquoise: '#2DB7A3',
+  brass: '#B58B2A',
+  // Semantic Colors
+  success: '#1F9D6A',
+  warning: '#D89B24',
+  error: '#D64545',
+  // Legacy support (mapped to new colors for gradual migration)
   primary: {
-    50: '#faf6f1',
-    100: '#f0e6d9',
-    200: '#e0ccb3',
-    300: '#c9a87a',
-    400: '#b8894d',
-    500: '#8B6F47',  // Main brand - richer brown
-    600: '#6B5538',
-    700: '#4a3a26',
-    800: '#3E2C1F',  // Dark brown for headings
-    900: '#2a1e15',
+    50: '#FAF7F2', // offWhite
+    100: '#F2EADF', // surfaceWarm
+    200: '#E7DDCF', // warmSand
+    300: '#E3D7C7', // borderWarm
+    400: '#B58B2A', // brass
+    500: '#12161C', // deepInk
+    600: '#6B4A2D', // saddleBrown
+    700: '#3A4652', // slate
+    800: '#12161C', // deepInk
+    900: '#12161C', // deepInk
   },
-  // Secondary - Sage greens (nature/pasture)
   secondary: {
-    50: '#f0f4f0',
-    100: '#dce5dc',
-    200: '#b8cbb8',
-    300: '#8baa8b',
-    400: '#5d8a5d',
-    500: '#4a7c4a',
-    600: '#3d663d',
-    700: '#2f4f2f',
-    800: '#243d24',
-    900: '#1a2c1a',
+    500: '#7C8A7A', // prairieSage
+    600: '#7C8A7A',
   },
-  // Accent - Warm gold
   accent: {
-    50: '#fefbf0',
-    100: '#fdf3d0',
-    200: '#fbe7a1',
-    300: '#f7d56b',
-    400: '#f2c038',
-    500: '#d4a537',
-    600: '#b8972e',
-    700: '#8c7323',
-    800: '#6b581b',
-    900: '#4a3d13',
+    500: '#B58B2A', // brass
   },
-  // Neutrals - Warm grays
   neutral: {
-    50: '#fafaf9',
-    100: '#f5f5f4',
-    200: '#e7e5e4',
-    300: '#d6d3d1',
-    400: '#a8a29e',
-    500: '#78716c',
-    600: '#57534e',
-    700: '#44403c',
-    800: '#292524',
-    900: '#1c1917',
+    50: '#FAF7F2', // offWhite
+    100: '#F6F1E8', // bone
+    200: '#E3D7C7', // borderWarm
+    300: '#E3D7C7', // borderWarm
+    400: '#E7DDCF', // warmSand
+    500: '#8B949E', // midGray
+    600: '#3A4652', // slate
+    700: '#3A4652', // slate
+    800: '#12161C', // deepInk
+    900: '#12161C', // deepInk
   },
-  // Semantic with softer tones
-  success: '#4ade80',
-  successBg: '#f0fdf4',
-  warning: '#fbbf24',
-  warningBg: '#fefce8',
-  error: '#f87171',
-  errorBg: '#fef2f2',
-  info: '#60a5fa',
-  infoBg: '#eff6ff',
-  // Surface colors
-  surface: '#ffffff',
+  successBg: '#F0FDF4',
+  warningBg: '#FEFCE8',
+  errorBg: '#FEF2F2',
+  info: '#2DB7A3', // turquoise
+  infoBg: '#EFF6FF',
+  surface: '#FFFFFF',
 };
 
+/**
+ * Spacing Scale (px)
+ * 4, 8, 12, 16, 20, 24, 32, 40, 48
+ */
 export const spacing = {
   xs: 4,
   sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  md: 12,
+  base: 16,
+  lg: 20,
+  xl: 24,
+  '2xl': 32,
+  '3xl': 40,
+  '4xl': 48,
+  // Legacy aliases for backward compatibility
+  4: 4,
+  8: 8,
+  12: 12,
+  16: 16,
+  20: 20,
+  24: 24,
+  32: 32,
+  40: 40,
+  48: 48,
+  // Old scale (gradual migration)
   xxl: 48,
 };
 
+/**
+ * Border Radius Scale (px)
+ * 8 (chips, small elements)
+ * 12 (inputs, buttons)
+ * 16 (cards)
+ * 24 (modals, sheets)
+ */
 export const borderRadius = {
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  sm: 8, // chips, small elements
+  md: 12, // inputs, buttons
+  lg: 16, // cards
+  xl: 24, // modals, sheets
   full: 9999,
 };
 
+/**
+ * Shadows
+ * Subtle shadows using deepInk color
+ */
 export const shadows = {
   sm: {
-    shadowColor: '#3E2C1F',
+    shadowColor: '#12161C', // deepInk
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
     elevation: 1,
   },
   md: {
-    shadowColor: '#3E2C1F',
+    shadowColor: '#12161C', // deepInk
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowRadius: 4,
     elevation: 2,
   },
   lg: {
-    shadowColor: '#3E2C1F',
+    shadowColor: '#12161C', // deepInk
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowRadius: 8,
     elevation: 4,
   },
   glow: {
-    shadowColor: '#8B6F47',
+    shadowColor: '#12161C', // deepInk
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 3,
   },
 };
 
+/**
+ * Gradients
+ * Use sparingly - prefer solid colors from the design system
+ */
 export const gradients = {
-  warmBackground: ['#faf6f1', '#f0e6d9'],
-  sunsetWarm: ['#fdf3d0', '#f0e6d9'],
-  cardHighlight: ['#ffffff', '#faf6f1'],
+  warmBackground: ['#FAF7F2', '#F2EADF'], // offWhite to surfaceWarm
+  cardHighlight: ['#FFFFFF', '#F6F1E8'], // white to bone
 };
 
 export const typography = {
@@ -127,20 +162,20 @@ export const typography = {
     letterSpacing: -0.5,
   },
   h2: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700' as const,
-    lineHeight: 34,
+    lineHeight: 32,
     letterSpacing: -0.3,
   },
   h3: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600' as const,
     lineHeight: 28,
   },
   h4: {
     fontSize: 18,
     fontWeight: '600' as const,
-    lineHeight: 24,
+    lineHeight: 26,
   },
   // Body
   body: {
@@ -151,7 +186,7 @@ export const typography = {
   bodyLarge: {
     fontSize: 18,
     fontWeight: '400' as const,
-    lineHeight: 28,
+    lineHeight: 26,
   },
   bodySmall: {
     fontSize: 14,
@@ -172,10 +207,19 @@ export const typography = {
     lineHeight: 20,
   },
   helper: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 16,
+  },
+  small: {
     fontSize: 14,
     fontWeight: '400' as const,
     lineHeight: 20,
-    fontStyle: 'italic' as const,
+  },
+  micro: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 16,
   },
   // Legacy support - weights object for backward compatibility
   weights: {

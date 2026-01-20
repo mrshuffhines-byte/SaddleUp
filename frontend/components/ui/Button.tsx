@@ -55,7 +55,7 @@ export default function Button({
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' || variant === 'secondary' ? colors.neutral[50] : colors.primary[500]} />
+        <ActivityIndicator color={variant === 'primary' ? colors.offWhite : colors.deepInk} />
       ) : (
         <>
           {icon && <Text style={styles.icon}>{icon}</Text>}
@@ -71,19 +71,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.md,
-    ...shadows.md,
+    borderRadius: borderRadius.md, // 12px for buttons
   },
   primary: {
-    backgroundColor: colors.primary[500],
+    backgroundColor: colors.deepInk,
+    // Shadow removed - use elevation instead for better performance
   },
   secondary: {
-    backgroundColor: colors.secondary[500],
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.borderWarm,
+    ...shadows.sm,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   outline: {
     backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: colors.primary[500],
+    borderWidth: 1,
+    borderColor: colors.borderWarm,
     ...shadows.sm,
     shadowOpacity: 0,
     elevation: 0,
@@ -103,9 +108,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   sizeLg: {
-    paddingVertical: spacing.md + 6,
+    paddingVertical: spacing.base, // 16px
     paddingHorizontal: spacing.xl,
-    minHeight: 56, // Large tap target for primary actions
+    minHeight: 52, // Design system: min-height 52px for primary buttons
   },
   fullWidth: {
     width: '100%',
@@ -117,16 +122,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   textPrimary: {
-    color: colors.neutral[50],
+    color: colors.offWhite, // Off-white text on deep ink background
   },
   textSecondary: {
-    color: colors.neutral[50],
+    color: colors.deepInk, // Deep ink text on white background
   },
   textOutline: {
-    color: colors.primary[500],
+    color: colors.deepInk,
   },
   textGhost: {
-    color: colors.primary[500],
+    color: colors.deepInk,
   },
   textSizeSm: {
     fontSize: typography.bodySmall.fontSize,

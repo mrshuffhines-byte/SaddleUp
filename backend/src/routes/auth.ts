@@ -57,7 +57,18 @@ router.post('/signup', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
     console.error('Signup error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    // Log the full error details for debugging
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    res.status(500).json({ 
+      error: 'Internal server error',
+      // Include more details in development
+      ...(process.env.NODE_ENV === 'development' && error instanceof Error && {
+        details: error.message
+      })
+    });
   }
 });
 

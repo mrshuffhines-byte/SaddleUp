@@ -238,7 +238,7 @@ export default function DashboardScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <ActivityIndicator size="large" color={colors.deepInk} />
       </View>
     );
   }
@@ -373,7 +373,7 @@ export default function DashboardScreen() {
         <Pressable
           style={styles.nextLessonCard}
           onPress={() => router.push(`/lesson/${nextLesson.lessonId}`)}
-          android_ripple={{ color: colors.primary[100] }}
+          android_ripple={{ color: colors.surfaceWarm }}
         >
           <Card style={styles.cardPressable}>
             <Text style={styles.cardLabel}>Continue Your Journey</Text>
@@ -510,7 +510,7 @@ const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.neutral[50],
+    backgroundColor: colors.offWhite, // Design system: off-white for background
   },
   scrollView: {
     flex: 1,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.neutral[50],
+    backgroundColor: colors.offWhite,
   },
   // Navigation Bar
   navBar: {
@@ -528,9 +528,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.neutral[200],
+    borderBottomColor: colors.borderWarm,
     ...shadows.sm,
     position: 'relative',
   },
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     ...typography.h2,
     fontFamily: 'serif',
     fontWeight: 'bold',
-    color: colors.neutral[900],
+    color: colors.deepInk,
   },
   navLinks: {
     flexDirection: 'row',
@@ -549,13 +549,13 @@ const styles = StyleSheet.create({
   },
   navLink: {
     ...typography.body,
-    color: colors.neutral[600],
+    color: colors.slate,
     fontWeight: '500',
   },
   navLinkActive: {
-    color: colors.neutral[900],
+    color: colors.deepInk,
     borderBottomWidth: 2,
-    borderBottomColor: colors.neutral[900],
+    borderBottomColor: colors.deepInk,
     paddingBottom: 2,
   },
   profileButton: {
@@ -565,20 +565,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.neutral[800],
+    backgroundColor: colors.deepInk,
     justifyContent: 'center',
     alignItems: 'center',
   },
   profileIconText: {
     ...typography.h4,
-    color: colors.surface,
+    color: colors.white,
     fontWeight: '700',
   },
   profileMenu: {
     position: 'absolute',
     top: 60,
     right: spacing.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.xs,
     minWidth: 180,
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   },
   profileMenuText: {
     ...typography.body,
-    color: colors.neutral[900],
+    color: colors.deepInk,
   },
   profileMenuDanger: {
     color: colors.error,
@@ -616,13 +616,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     ...typography.h1,
     fontSize: 32,
-    color: colors.surface,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   heroSubtitle: {
     ...typography.bodyLarge,
     fontSize: 18,
-    color: colors.neutral[100],
+    color: colors.bone,
   },
   // Floating Stats Ribbon
   statsRibbon: {
@@ -639,12 +639,12 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...typography.h3,
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.md,
   },
   cardLabel: {
     ...typography.caption,
-    color: colors.neutral[500],
+    color: colors.midGray,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: spacing.xs,
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     ...typography.bodySmall,
-    color: colors.neutral[600],
+    color: colors.slate,
     marginBottom: spacing.md,
   },
   statsRow: {
@@ -667,11 +667,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     paddingVertical: spacing.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
     ...shadows.md,
     borderWidth: 1,
-    borderColor: colors.neutral[200],
+    borderColor: colors.borderWarm,
   },
   statBadgeIcon: {
     fontSize: 32,
@@ -681,13 +681,13 @@ const styles = StyleSheet.create({
     ...typography.h2,
     fontSize: 28,
     fontWeight: '700',
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.xs,
   },
   statBadgeLabel: {
     ...typography.bodySmall,
     fontSize: 12,
-    color: colors.neutral[600],
+    color: colors.slate,
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -695,9 +695,9 @@ const styles = StyleSheet.create({
     margin: spacing.lg,
     marginTop: spacing.xl,
     marginBottom: spacing.md,
-    backgroundColor: colors.primary[50],
-    borderWidth: 2,
-    borderColor: colors.primary[200],
+    backgroundColor: colors.bone,
+    borderWidth: 1,
+    borderColor: colors.borderWarm,
   },
   planGeneratorHeader: {
     flexDirection: 'row',
@@ -713,12 +713,12 @@ const styles = StyleSheet.create({
   },
   planGeneratorTitle: {
     ...typography.h3,
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.xs,
   },
   planGeneratorSubtitle: {
     ...typography.body,
-    color: colors.neutral[600],
+    color: colors.slate,
   },
   planGeneratorFeatures: {
     marginBottom: spacing.lg,
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   },
   planGeneratorFeatureText: {
     ...typography.bodySmall,
-    color: colors.neutral[700],
+    color: colors.slate,
   },
   planGeneratorButton: {
     marginTop: spacing.sm,
@@ -748,25 +748,25 @@ const styles = StyleSheet.create({
   },
   nextLessonTitle: {
     ...typography.h3,
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.xs,
   },
   nextLessonMeta: {
     ...typography.bodySmall,
-    color: colors.neutral[600],
+    color: colors.slate,
     marginBottom: spacing.md,
   },
   continueButton: {
     alignSelf: 'flex-start',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.primary[500],
+    backgroundColor: colors.deepInk,
     borderRadius: borderRadius.md,
     marginTop: spacing.xs,
   },
   continueButtonText: {
     ...typography.body,
-    color: colors.neutral[50],
+    color: colors.offWhite,
     fontWeight: '600',
   },
   // Main Grid
@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: 'serif',
     fontWeight: 'bold',
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.md,
   },
   quickActions: {
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
   quickActionButton: {
     flex: 1,
     minWidth: width < 400 ? '100%' : '45%',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     alignItems: 'center',
@@ -812,22 +812,22 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: {
     ...typography.bodySmall,
-    color: colors.neutral[900],
+    color: colors.deepInk,
     fontWeight: '500',
   },
   // Trainer's Tip Card (Sage Green)
   trainerTipCard: {
     padding: spacing.lg,
-    backgroundColor: colors.secondary[50],
+    backgroundColor: colors.bone,
     borderWidth: 1,
-    borderColor: colors.secondary[200],
+    borderColor: colors.borderWarm,
   },
   trainerTipLabel: {
     ...typography.body,
     fontSize: 18,
     fontFamily: 'serif',
     fontWeight: '600',
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -835,23 +835,23 @@ const styles = StyleSheet.create({
   trainerTipText: {
     ...typography.body,
     fontSize: 16,
-    color: colors.neutral[700],
+    color: colors.slate,
     lineHeight: 24,
     fontStyle: 'italic',
   },
   // Up Next Widget
   upNextCard: {
     padding: spacing.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.neutral[200],
+    borderColor: colors.borderWarm,
   },
   upNextLabel: {
     ...typography.body,
     fontSize: 18,
     fontFamily: 'serif',
     fontWeight: '600',
-    color: colors.neutral[900],
+    color: colors.deepInk,
     marginBottom: spacing.md,
   },
   upNextContent: {
@@ -864,7 +864,7 @@ const styles = StyleSheet.create({
   },
   upNextText: {
     ...typography.body,
-    color: colors.neutral[600],
+    color: colors.slate,
     marginBottom: spacing.md,
     fontSize: 14,
   },
@@ -873,7 +873,7 @@ const styles = StyleSheet.create({
   },
   upNextButtonText: {
     ...typography.body,
-    color: colors.neutral[900],
+    color: colors.deepInk,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -900,7 +900,7 @@ const styles = StyleSheet.create({
   },
   planStatusText: {
     ...typography.bodySmall,
-    color: colors.neutral[700],
+    color: colors.slate,
     marginBottom: spacing.md,
   },
   planStatusButton: {
@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
   },
   planStatusButtonText: {
     ...typography.bodySmall,
-    color: colors.surface,
+    color: colors.white,
     fontWeight: '600',
   },
 });

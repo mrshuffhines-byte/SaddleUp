@@ -1,38 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
   Image,
-  Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { API_URL } from '../constants';
-import { colors, spacing, typography, borderRadius, shadows } from '../theme';
-import { Card, Button, Toast } from '../../components/ui';
-
-interface TimestampReference {
-  timestamp: string;
-  text: string;
-  type?: 'positive' | 'concern' | 'instruction';
-}
-
-interface MediaAnalysis {
-  hasMedia: boolean;
-  mediaCount: number;
-  timestampReferences?: TimestampReference[];
-  hasVideoTimestamps?: boolean;
-}
+import { colors, spacing } from '../theme';
+import { Toast } from '../../components/ui';
+import {
+  SafetyDisclaimerBar,
+  ChatMessage,
+  SuggestedPromptsRow,
+  TypingIndicator,
+  EmptyStateCoach,
+  ErrorBanner,
+  ChatInput,
+  AddToPlanSheet,
+  SaveTemplateSheet,
+} from '../../components/chat';
+import { parseCoachMessage, ParsedCoachMessage } from '../../components/chat/parseCoachMessage';
 
 interface Message {
   id: string;
@@ -40,7 +36,6 @@ interface Message {
   content: string;
   createdAt: string;
   mediaUrls?: string[];
-  mediaAnalysis?: MediaAnalysis;
 }
 
 interface Conversation {
@@ -48,6 +43,16 @@ interface Conversation {
   title?: string;
   messages: Message[];
 }
+
+interface ExtendedMessage extends Message {
+  parsed?: ParsedCoachMessage;
+}
+
+const RESPONSE_PROMPTS = [
+  'Make it shorter',
+  'Explain step 2 more',
+  'What equipment do I need?',
+];
 
 export default function ChatScreen() {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -58,7 +63,26 @@ export default function ChatScreen() {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; thumbnail?: string; type: 'photo' | 'video' } | null>(null);
+  const [offline, setOffline] = useState(false);
+  const [showAddToPlan, setShowAddToPlan] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [selectedMessageForAction, setSelectedMessageForAction] = useState<ExtendedMessage | null>(null);
+  const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; visible: boolean }>({
+    message: '',
+    type: 'success',
+    visible: false,
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type, visible: true });
+  };
+
+  const hideToast = () => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  };
 
   useEffect(() => {
     loadConversations();
@@ -84,6 +108,7 @@ export default function ChatScreen() {
 
       const data = await response.json();
       setConversations(data);
+      setOffline(false);
 
       // Load first conversation if exists
       if (data.length > 0 && !currentConversation) {
@@ -93,6 +118,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error('Load conversations error:', error);
+      setOffline(true);
     } finally {
       setLoadingConversations(false);
     }
@@ -115,9 +141,15 @@ export default function ChatScreen() {
 
       const data = await response.json();
       setCurrentConversation(data);
+      setOffline(false);
+      
+      // Scroll to bottom after loading
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
     } catch (error) {
       console.error('Load conversation error:', error);
-      Alert.alert('Error', 'Failed to load conversation');
+      setOffline(true);
     }
   };
 
@@ -146,13 +178,10 @@ export default function ChatScreen() {
       setCurrentConversation(data);
       await loadConversations();
       
-      // If there's an initial message, send it
       if (initialMessage && initialMessage.trim()) {
-        // Use the main sendMessage function which handles everything properly
         setMessage(initialMessage.trim());
-        // The user can now click send, or we can trigger it after a brief delay
         setTimeout(() => {
-          sendMessage();
+          sendMessage(initialMessage.trim());
         }, 100);
       }
       
@@ -164,7 +193,6 @@ export default function ChatScreen() {
     }
   };
 
-
   const uploadMedia = async (uri: string, type: 'photo' | 'video'): Promise<string> => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -172,22 +200,15 @@ export default function ChatScreen() {
         throw new Error('Not authenticated');
       }
 
-      // Create FormData
       const formData = new FormData();
-      
-      // Get file name and type from URI
       const filename = uri.split('/').pop() || `media.${type === 'photo' ? 'jpg' : 'mp4'}`;
-      const match = /\.(\w+)$/.exec(filename);
-      const ext = match && match[1] ? match[1] : (type === 'photo' ? 'jpg' : 'mp4');
       const typeFormValue = type === 'photo' ? 'image/jpeg' : 'video/mp4';
       
-      // For web, we need to fetch the file as a blob first
       if (Platform.OS === 'web') {
         const response = await fetch(uri);
         const blob = await response.blob();
         formData.append('media', blob, filename);
       } else {
-        // For native, use the URI directly
         formData.append('media', {
           uri,
           type: typeFormValue,
@@ -201,7 +222,6 @@ export default function ChatScreen() {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          // Don't set Content-Type for FormData - let the browser set it with boundary
         },
         body: formData,
       });
@@ -221,11 +241,12 @@ export default function ChatScreen() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!message.trim() && !selectedMedia) return;
+  const sendMessage = async (messageText?: string) => {
+    const messageToSend = messageText || message.trim();
+    if (!messageToSend && !selectedMedia) return;
 
-    const messageText = message.trim();
     const mediaToUpload = selectedMedia;
+    const originalMessage = message;
     
     setMessage('');
     setSelectedMedia(null);
@@ -239,7 +260,6 @@ export default function ChatScreen() {
         return;
       }
 
-      // Upload media first if present
       let mediaUrls: string[] = [];
       if (mediaToUpload) {
         try {
@@ -247,13 +267,12 @@ export default function ChatScreen() {
           mediaUrls = [uploadedUrl];
         } catch (uploadError: any) {
           Alert.alert('Upload Error', uploadError.message || 'Failed to upload media. Please try again.');
-          setMessage(messageText); // Restore message on error
-          setSelectedMedia(mediaToUpload); // Restore media on error
+          setMessage(originalMessage);
+          setSelectedMedia(mediaToUpload);
           return;
         }
       }
 
-      // Create conversation if it doesn't exist
       let conversation = currentConversation;
       if (!conversation) {
         const createResponse = await fetch(`${API_URL}/api/conversations`, {
@@ -273,7 +292,6 @@ export default function ChatScreen() {
         setCurrentConversation(conversation);
       }
 
-      // Send the message with media URLs
       const response = await fetch(`${API_URL}/api/messages`, {
         method: 'POST',
         headers: {
@@ -282,7 +300,7 @@ export default function ChatScreen() {
         },
         body: JSON.stringify({
           conversationId: conversation.id,
-          content: messageText || (mediaUrls.length > 0 ? '📷' : ''), // Send at least a placeholder if only media
+          content: messageToSend || (mediaUrls.length > 0 ? '📷' : ''),
           mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
         }),
       });
@@ -291,16 +309,20 @@ export default function ChatScreen() {
         throw new Error('Failed to send message');
       }
 
-      const data = await response.json();
-      
-      // Reload conversation to get updated messages
       await loadConversation(conversation.id);
       await loadConversations();
+      setOffline(false);
+      
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send message');
-      setMessage(messageText); // Restore message on error
+      console.error('Send message error:', error);
+      setOffline(true);
+      Alert.alert('Error', error.message || 'Failed to send message. Please check your connection.');
+      setMessage(originalMessage);
       if (mediaToUpload) {
-        setSelectedMedia(mediaToUpload); // Restore media on error
+        setSelectedMedia(mediaToUpload);
       }
     } finally {
       setLoading(false);
@@ -308,21 +330,35 @@ export default function ChatScreen() {
     }
   };
 
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; visible: boolean }>({
-    message: '',
-    type: 'success',
-    visible: false,
-  });
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type, visible: true });
+  const handleSelectPrompt = (prompt: string) => {
+    if (!currentConversation) {
+      createNewConversation(prompt).catch(err => {
+        console.error('Failed to create conversation:', err);
+      });
+    } else {
+      sendMessage(prompt);
+    }
   };
 
-  const hideToast = () => {
-    setToast((prev) => ({ ...prev, visible: false }));
+  const handleAddToPlan = (message: ExtendedMessage) => {
+    setSelectedMessageForAction(message);
+    setShowAddToPlan(true);
   };
 
-  const saveAnswer = async (question: string, answer: string) => {
+  const handleSaveTemplate = (message: ExtendedMessage) => {
+    setSelectedMessageForAction(message);
+    setShowSaveTemplate(true);
+  };
+
+  const handleConfirmAddToPlan = async (date: Date, time: string) => {
+    // TODO: Implement add to plan API call
+    showToast(`Added to your plan for ${date.toLocaleDateString('en-US', { weekday: 'long' })}`, 'success');
+    setSelectedMessageForAction(null);
+  };
+
+  const handleConfirmSaveTemplate = async (name: string) => {
+    if (!selectedMessageForAction) return;
+    
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
@@ -334,337 +370,162 @@ export default function ChatScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          question,
-          answer,
+          question: 'Template',
+          answer: selectedMessageForAction.content,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save answer');
+        throw new Error('Failed to save template');
       }
 
-      showToast('Answer saved to your library!', 'success');
+      showToast('Saved to your Library', 'success');
+      setSelectedMessageForAction(null);
     } catch (error: any) {
-      showToast(error.message || 'Failed to save answer', 'error');
+      showToast(error.message || 'Failed to save template', 'error');
     }
   };
 
-  const showMediaOptions = async () => {
-    Alert.alert(
-      'Add Media',
-      'Choose an option',
-      [
-        { text: 'Camera', onPress: pickImageFromCamera },
-        { text: 'Photo Library', onPress: pickImageFromLibrary },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  };
-
-  const pickImageFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera permission is required');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setSelectedMedia({
-        url: result.assets[0].uri,
-        thumbnail: result.assets[0].uri,
-        type: result.assets[0].type === 'video' ? 'video' : 'photo',
-      });
-    }
-  };
-
-  const pickImageFromLibrary = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Photo library permission is required');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setSelectedMedia({
-        url: result.assets[0].uri,
-        thumbnail: result.assets[0].uri,
-        type: result.assets[0].type === 'video' ? 'video' : 'photo',
-      });
-    }
-  };
-
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item }: { item: ExtendedMessage }) => {
     const isUser = item.role === 'user';
-    const hasVideoTimestamps = !isUser && 
-      item.mediaAnalysis?.hasVideoTimestamps && 
-      item.mediaAnalysis?.timestampReferences &&
-      item.mediaAnalysis.timestampReferences.length > 0;
+    
+    if (isUser) {
+      return (
+        <ChatMessage
+          message={{
+            id: item.id,
+            role: 'user',
+            content: item.content,
+            createdAt: item.createdAt,
+          }}
+        />
+      );
+    }
 
-    // Find the user message that preceded this assistant message for saving
-    const messages = currentConversation?.messages || [];
-    const messageIndex = messages.findIndex(m => m.id === item.id);
-    const precedingUserMessage = messageIndex > 0 && messages[messageIndex - 1]?.role === 'user'
-      ? messages[messageIndex - 1].content
-      : '';
+    // Parse coach message if not already parsed
+    const parsed = item.parsed || parseCoachMessage(item.content);
 
     return (
-      <View
-        style={[
-          styles.messageWrapper,
-          isUser && styles.userMessageWrapper,
-        ]}
-      >
-        <View
-          style={[
-            styles.messageBubble,
-            isUser ? styles.userMessageBubble : styles.assistantMessageBubble,
-          ]}
-        >
-          <Text
-            style={[
-              styles.messageText,
-              isUser ? styles.userMessageText : styles.assistantMessageText,
-            ]}
-          >
-            {item.content}
-          </Text>
-          {hasVideoTimestamps && (
-            <View style={styles.timestampsContainer}>
-              <Text style={styles.timestampsTitle}>Key Moments:</Text>
-              {item.mediaAnalysis!.timestampReferences!.slice(0, 5).map((ref, idx) => (
-                <View key={idx} style={styles.timestampBadge}>
-                  <Text style={styles.timestampText}>{ref.timestamp}</Text>
-                </View>
-              ))}
-              {item.mediaAnalysis!.timestampReferences!.length > 5 && (
-                <Text style={styles.moreTimestamps}>
-                  +{item.mediaAnalysis!.timestampReferences!.length - 5} more
-                </Text>
-              )}
-            </View>
-          )}
-          {!isUser && (
-            <Pressable
-              style={styles.saveButton}
-              onPress={() => saveAnswer(precedingUserMessage, item.content)}
-            >
-              <Text style={styles.saveButtonText}>💾 Save Answer</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
+      <ChatMessage
+        message={{
+          id: item.id,
+          role: 'assistant',
+          content: parsed.intro,
+          createdAt: item.createdAt,
+          steps: parsed.steps,
+          whenToStop: parsed.whenToStop,
+          hasSafetyConcern: parsed.hasSafetyConcern,
+        }}
+        onAddToPlan={parsed.steps ? () => handleAddToPlan(item) : undefined}
+        onSaveTemplate={() => handleSaveTemplate(item)}
+      />
     );
   };
-
-  const SuggestionChip = ({ text, onPress }: { text: string; onPress: () => void }) => (
-    <Pressable style={styles.suggestionChip} onPress={onPress}>
-      <Text style={styles.suggestionChipText}>{text}</Text>
-    </Pressable>
-  );
 
   if (loadingConversations) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={colors.primary[500]} />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.deepInk} />
       </View>
     );
   }
 
-  const messages = currentConversation?.messages || [];
+  const messages = currentConversation?.messages.map((msg): ExtendedMessage => ({
+    ...msg,
+    parsed: msg.role === 'assistant' ? parseCoachMessage(msg.content) : undefined,
+  })) || [];
 
-  if (!currentConversation || messages.length === 0) {
-    return (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-        keyboardVerticalOffset={90}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.welcomeContainer}
-        >
-          <View style={styles.welcomeChat}>
-            <View style={styles.welcomeHeader}>
-              <Text style={styles.welcomeEmoji}>🤠</Text>
-              <Text style={styles.welcomeTitle}>Ask the Trainer</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Get answers to any horse training question. I know your experience level 
-                and goals, so I'll give you advice that fits your situation.
-              </Text>
-            </View>
-            
-            <View style={styles.suggestionsSection}>
-              <Text style={styles.suggestionsTitle}>Try asking:</Text>
-              <View style={styles.suggestions}>
-                {[
-                  "How do I know if my horse is relaxed?",
-                  "What should I do if my horse won't stand still?",
-                  "How tight should my girth be?",
-                  "My horse keeps walking off when I try to mount",
-                  "Is it safe to ride alone on trails?",
-                ].map((question, index) => (
-                  <SuggestionChip
-                    key={index}
-                    text={question}
-                    onPress={() => {
-                      createNewConversation(question).catch(err => {
-                        console.error('Failed to create conversation:', err);
-                      });
-                    }}
-                  />
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.safetyNote}>
-              <Text style={styles.safetyNoteIcon}>💡</Text>
-              <Text style={styles.safetyNoteText}>
-                For emergencies or serious behavioral issues, always consult a 
-                professional trainer or veterinarian in person.
-              </Text>
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* Input bar at bottom even when no conversation */}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity
-            style={styles.mediaButton}
-            onPress={showMediaOptions}
-            disabled={loading || uploadingMedia}
-          >
-            {uploadingMedia ? (
-              <ActivityIndicator color={colors.primary[500]} size="small" />
-            ) : (
-              <Text style={styles.mediaButtonText}>📷</Text>
-            )}
-          </TouchableOpacity>
-          <TextInput
-            style={styles.input}
-            placeholder="Ask a question..."
-            placeholderTextColor={colors.neutral[400]}
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            editable={!loading}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!message.trim() && !selectedMedia) || loading ? styles.sendButtonDisabled : null,
-            ]}
-            onPress={sendMessage}
-            disabled={(!message.trim() && !selectedMedia) || loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.surface} size="small" />
-            ) : (
-              <Text style={styles.sendButtonText}>Send</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    );
-  }
+  const showEmptyState = !currentConversation || messages.length === 0;
+  const lastMessage = messages[messages.length - 1];
+  const showResponsePrompts = !showEmptyState && lastMessage?.role === 'assistant' && !isTyping;
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      <View style={styles.container}>
+        <SafetyDisclaimerBar />
+        
+        {offline && <ErrorBanner />}
+
+        {showEmptyState ? (
+          <EmptyStateCoach onSelectPrompt={handleSelectPrompt} />
+        ) : (
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.messagesList}
+              ListFooterComponent={
+                isTyping ? <TypingIndicator /> : null
+              }
+              onContentSizeChange={() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }}
+            />
+
+            {showResponsePrompts && (
+              <SuggestedPromptsRow
+                prompts={RESPONSE_PROMPTS}
+                onSelectPrompt={handleSelectPrompt}
+              />
+            )}
+          </>
+        )}
+
+        {selectedMedia && (
+          <View style={styles.mediaPreview}>
+            {selectedMedia.type === 'photo' ? (
+              <Image source={{ uri: selectedMedia.url }} style={styles.mediaPreviewImage} />
+            ) : (
+              <Image source={{ uri: selectedMedia.thumbnail }} style={styles.mediaPreviewImage} />
+            )}
+            <TouchableOpacity
+              style={styles.removeMediaButton}
+              onPress={() => setSelectedMedia(null)}
+            >
+              <Text style={styles.removeMediaText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <ChatInput
+          value={message}
+          onChangeText={setMessage}
+          onSend={() => sendMessage()}
+          disabled={loading || uploadingMedia}
+        />
+      </View>
+
       <Toast
         message={toast.message}
         type={toast.type}
         visible={toast.visible}
         onHide={hideToast}
       />
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messagesList}
-        inverted={false}
-        ListFooterComponent={
-          isTyping ? (
-            <View style={styles.typingIndicator}>
-              <View style={styles.typingDots}>
-                <View style={[styles.dot, styles.dot1]} />
-                <View style={[styles.dot, styles.dot2]} />
-                <View style={[styles.dot, styles.dot3]} />
-              </View>
-              <Text style={styles.typingText}>Trainer is thinking...</Text>
-            </View>
-          ) : null
-        }
+
+      <AddToPlanSheet
+        visible={showAddToPlan}
+        onClose={() => {
+          setShowAddToPlan(false);
+          setSelectedMessageForAction(null);
+        }}
+        onConfirm={handleConfirmAddToPlan}
       />
 
-      {selectedMedia && (
-        <View style={styles.mediaPreview}>
-          {selectedMedia.type === 'photo' ? (
-            <Image source={{ uri: selectedMedia.url }} style={styles.mediaPreviewImage} />
-          ) : (
-            <Image source={{ uri: selectedMedia.thumbnail }} style={styles.mediaPreviewImage} />
-          )}
-          <TouchableOpacity
-            style={styles.removeMediaButton}
-            onPress={() => setSelectedMedia(null)}
-          >
-            <Text style={styles.removeMediaText}>×</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <View style={styles.inputContainer}>
-        <TouchableOpacity
-          style={styles.mediaButton}
-          onPress={showMediaOptions}
-          disabled={loading || uploadingMedia}
-        >
-          {uploadingMedia ? (
-            <ActivityIndicator color={colors.primary[500]} size="small" />
-          ) : (
-            <Text style={styles.mediaButtonText}>📷</Text>
-          )}
-        </TouchableOpacity>
-        <TextInput
-          style={styles.input}
-          placeholder="Ask a question..."
-          placeholderTextColor={colors.neutral[400]}
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          editable={!loading}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            ((!message.trim() && !selectedMedia) || loading) && styles.sendButtonDisabled,
-          ]}
-          onPress={sendMessage}
-          disabled={(!message.trim() && !selectedMedia) || loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.surface} size="small" />
-          ) : (
-            <Text style={styles.sendButtonText}>Send</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <SaveTemplateSheet
+        visible={showSaveTemplate}
+        onClose={() => {
+          setShowSaveTemplate(false);
+          setSelectedMessageForAction(null);
+        }}
+        onConfirm={handleConfirmSaveTemplate}
+        defaultName={selectedMessageForAction?.content.split('\n')[0] || ''}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -672,267 +533,20 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.neutral[50],
+    backgroundColor: colors.offWhite,
   },
-  scrollView: {
+  loadingContainer: {
     flex: 1,
-  },
-  welcomeContainer: {
-    flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  welcomeChat: {
     alignItems: 'center',
-    maxWidth: 500,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  welcomeHeader: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  welcomeEmoji: {
-    fontSize: 64,
-    marginBottom: spacing.md,
-  },
-  welcomeTitle: {
-    ...typography.h2,
-    color: colors.neutral[900],
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    ...typography.body,
-    color: colors.neutral[600],
-    textAlign: 'center',
-    lineHeight: typography.body.lineHeight,
-  },
-  suggestionsSection: {
-    width: '100%',
-    marginBottom: spacing.xl,
-  },
-  suggestionsTitle: {
-    ...typography.h4,
-    color: colors.neutral[800],
-    marginBottom: spacing.md,
-  },
-  suggestions: {
-    width: '100%',
-    gap: spacing.sm,
-  },
-  suggestionChip: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-    ...shadows.sm,
-  },
-  suggestionChipText: {
-    ...typography.body,
-    color: colors.neutral[700],
-  },
-  safetyNote: {
-    flexDirection: 'row',
-    backgroundColor: colors.secondary[50],
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.secondary[500],
-    width: '100%',
-  },
-  safetyNoteIcon: {
-    fontSize: typography.body.fontSize,
-    marginRight: spacing.sm,
-  },
-  safetyNoteText: {
-    ...typography.bodySmall,
-    color: colors.secondary[800],
-    flex: 1,
-    lineHeight: typography.bodySmall.lineHeight,
-  },
-  typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  typingDots: {
-    flexDirection: 'row',
-    marginRight: spacing.sm,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.neutral[400],
-    marginHorizontal: 2,
-  },
-  dot1: {
-    opacity: 0.4,
-  },
-  dot2: {
-    opacity: 0.6,
-  },
-  dot3: {
-    opacity: 0.8,
-  },
-  typingText: {
-    ...typography.bodySmall,
-    color: colors.neutral[500],
-    fontStyle: 'italic',
+    backgroundColor: colors.offWhite,
   },
   messagesList: {
-    padding: spacing.lg,
-    paddingBottom: 80,
-  },
-  messageWrapper: {
-    width: '100%',
-    marginBottom: spacing.md,
-    alignItems: 'flex-start',
-  },
-  userMessageWrapper: {
-    alignItems: 'flex-end',
-  },
-  messageBubble: {
-    maxWidth: '80%',
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    ...shadows.sm,
-  },
-  userMessageBubble: {
-    backgroundColor: colors.primary[500],
-  },
-  assistantMessageBubble: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-  },
-  messageText: {
-    ...typography.body,
-    lineHeight: typography.body.lineHeight,
-  },
-  userMessageText: {
-    color: colors.surface,
-  },
-  assistantMessageText: {
-    color: colors.neutral[900],
-  },
-  timestampsContainer: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral[200],
-  },
-  timestampsTitle: {
-    ...typography.bodySmall,
-    fontWeight: '600',
-    color: colors.primary[500],
-    marginBottom: spacing.sm,
-  },
-  timestampBadge: {
-    backgroundColor: colors.neutral[50],
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginRight: spacing.xs,
-    marginBottom: spacing.xs,
-    alignSelf: 'flex-start',
-  },
-  timestampText: {
-    ...typography.caption,
-    color: colors.primary[500],
-    fontWeight: '600',
-  },
-  moreTimestamps: {
-    ...typography.caption,
-    color: colors.neutral[400],
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
-  },
-  saveButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.sm,
-    alignSelf: 'flex-start',
-  },
-  saveButtonText: {
-    ...typography.caption,
-    color: colors.primary[700],
-    fontWeight: '600',
-  },
-  typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-  },
-  typingDots: {
-    flexDirection: 'row',
-    marginRight: spacing.sm,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.neutral[400],
-    marginHorizontal: 2,
-  },
-  dot1: {
-    opacity: 0.4,
-  },
-  dot2: {
-    opacity: 0.6,
-  },
-  dot3: {
-    opacity: 0.8,
-  },
-  typingText: {
-    ...typography.bodySmall,
-    color: colors.neutral[500],
-    fontStyle: 'italic',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral[200],
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.neutral[50],
-    borderRadius: borderRadius.full,
-    padding: spacing.md,
-    paddingHorizontal: spacing.lg,
-    ...typography.body,
-    maxHeight: 100,
-    marginRight: spacing.sm,
-    color: colors.neutral[900],
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-  },
-  sendButton: {
-    backgroundColor: colors.primary[500],
-    borderRadius: borderRadius.full,
-    padding: spacing.md,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '600',
+    paddingVertical: spacing.base,
+    paddingBottom: spacing.xl,
   },
   mediaPreview: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.base,
     marginBottom: spacing.sm,
     position: 'relative',
     alignSelf: 'flex-start',
@@ -940,32 +554,23 @@ const styles = StyleSheet.create({
   mediaPreviewImage: {
     width: 150,
     height: 150,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.neutral[200],
+    borderRadius: 12,
+    backgroundColor: colors.borderWarm,
   },
   removeMediaButton: {
     position: 'absolute',
     top: -8,
     right: -8,
     backgroundColor: colors.error,
-    borderRadius: borderRadius.full,
+    borderRadius: 12,
     width: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   removeMediaText: {
-    color: colors.surface,
+    color: colors.white,
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  mediaButton: {
-    padding: spacing.md,
-    marginRight: spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mediaButtonText: {
-    fontSize: 24,
   },
 });
